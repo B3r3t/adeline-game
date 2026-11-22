@@ -1,5 +1,5 @@
 extends Node2D
-## Mission 1, "Goblin Trouble", built from placeholder shapes.
+## Mission 1, "Goblin Trouble", built from placeholder shapes, with Spirit the horse to ride.
 ## The home island is one long strip: Adeline's house and stable on the left,
 ## Merlin's hut, three goblin camps to the east, and the river with the boat at the far end.
 
@@ -9,6 +9,7 @@ const HillsScript := preload("res://scripts/hills.gd")
 const HudScript := preload("res://scripts/hud.gd")
 const TouchScript := preload("res://scripts/touch_controls.gd")
 const DialogScript := preload("res://scripts/dialog.gd")
+const HorseScript := preload("res://scripts/horse.gd")
 
 const GROUND_Y := 560.0
 const LEVEL_LEFT := 0.0
@@ -16,12 +17,14 @@ const LEVEL_RIGHT := 5400.0
 const CAMERA_ZOOM := 1.4  # bigger characters are easier to read on an 8 inch screen
 
 const HOUSE_X := 150.0
+const STABLE_X := 470.0  # where Spirit waits
 const START_X := 660.0
 const MERLIN_X := 1280.0
 const SIGN_X := 1560.0
 const GATE_X := 1700.0  # Adeline cannot head east until she has the mission
 const RIVER_X := 5080.0
 const TALK_RANGE := 120.0
+const RIDE_RANGE := 100.0
 const SAVE_PATH := "user://save.json"
 
 # Five goblins in three camps. The first teaches the swing, the second the charge,
@@ -45,6 +48,7 @@ const ENCOUNTERS := [
 ]
 
 var player = null
+var horse = null
 var goblins: Array = []
 var projectiles: Node2D
 var camera: Camera2D
@@ -77,6 +81,11 @@ func _ready() -> void:
 
 	projectiles = Node2D.new()
 	add_child(projectiles)
+
+	horse = Node2D.new()
+	horse.set_script(HorseScript)
+	horse.game = self
+	add_child(horse)
 
 	player = CharacterBody2D.new()
 	player.set_script(PlayerScript)
@@ -228,7 +237,10 @@ func _place_player() -> void:
 	encounter = {}
 	encounter_kind = ""
 	defeated = false
-	player.reset(Vector2(float(data["checkpoint_x"]), GROUND_Y))
+	var cx := float(data["checkpoint_x"])
+	player.reset(Vector2(cx, GROUND_Y))
+	# Spirit starts in the stable, or close by when continuing from far along the island.
+	horse.place(STABLE_X if cx < 1000.0 else cx - 130.0)
 	_update_limits()
 
 
@@ -360,6 +372,10 @@ func _check_triggers() -> void:
 		return
 	var enc: Dictionary = ENCOUNTERS[n]
 	if player.position.x >= float(enc["trigger"]):
+		if player.mounted:
+			_dismount()
+			toast("Spirit waits back here, safe from the goblins.")
+		horse.retreat(float(enc["left"]) - 90.0)
 		_begin_encounter(enc, "mission")
 
 
@@ -369,10 +385,17 @@ func _update_context() -> void:
 	context_action = ""
 	if dialog.active or not encounter.is_empty():
 		return
-	if absf(player.position.x - MERLIN_X) <= TALK_RANGE:
+	var px: float = player.position.x
+	if absf(px - MERLIN_X) <= TALK_RANGE:
 		context_action = "talk"
-	elif player.position.x >= RIVER_X - 160.0:
+	elif px >= RIVER_X - 160.0:
 		context_action = "boat"
+	elif player.mounted:
+		context_action = "dismount"
+	elif absf(px - horse.position.x) <= RIDE_RANGE:
+		context_action = "ride"
+	else:
+		context_action = "call"
 
 
 func merlin_has_news() -> bool:
@@ -381,10 +404,36 @@ func merlin_has_news() -> bool:
 
 func _interact() -> void:
 	controls.release_all()
-	if context_action == "talk":
+	if context_action == "ride":
+		_mount()
+	elif context_action == "dismount":
+		_dismount()
+	elif context_action == "call":
+		horse.come()
+	elif context_action == "talk":
+		_dismount()
 		_talk_to_merlin()
 	elif context_action == "boat":
+		_dismount()
 		dialog.say("", ["The magic boat rocks gently on the river.", "It will fly to the other islands once the rescue mission is ready."])
+
+
+func _mount() -> void:
+	if not player.is_on_floor():
+		return
+	player.mounted = true
+	player.position.x = horse.position.x
+	player.facing = horse.facing
+	horse.set_mounted(true)
+
+
+func _dismount() -> void:
+	if not player.mounted:
+		return
+	player.mounted = false
+	horse.set_mounted(false)
+	horse.position = Vector2(player.position.x, GROUND_Y)
+	player.position.x += player.facing * 80.0
 
 
 func _talk_to_merlin() -> void:
@@ -444,6 +493,8 @@ func _give_shield() -> void:
 
 
 func _begin_practice() -> void:
+	_dismount()
+	horse.retreat(1040.0)
 	var n := int(data["practice_round"])
 	var specs := []
 	for i in n:
@@ -479,11 +530,15 @@ func hint() -> String:
 	if m1 == "available":
 		if context_action == "talk":
 			return "Tap TALK to speak with Merlin."
-		return "Walk right with the arrows. Merlin is waiting by his hut."
+		if context_action == "ride":
+			return "Tap RIDE to hop on Spirit."
+		if player.mounted:
+			return "Ride right. Merlin is waiting by his hut."
+		return "Tap CALL and Spirit will come to you. Merlin is waiting to the right."
 	if m1 == "active":
 		if cleared() < ENCOUNTERS.size():
-			return "Head east, past the signpost."
-		return "The goblins are gone. Head back west to Merlin."
+			return "Head east past the signpost. Spirit can carry you there fast."
+		return "The goblins are gone. Call Spirit and ride back west to Merlin."
 	return "Talk to Merlin for a practice fight and try your new shield."
 
 
@@ -588,13 +643,6 @@ func _draw_house(g: float) -> void:
 	draw_rect(Rect2(hx + 220.0, g - 120.0, 200.0, 120.0), Color(0.55, 0.38, 0.22))
 	draw_rect(Rect2(hx + 236.0, g - 100.0, 168.0, 100.0), Color(0.25, 0.17, 0.1))
 	draw_rect(Rect2(hx + 212.0, g - 134.0, 216.0, 14.0), Color(0.4, 0.26, 0.15))
-	# Horse, waiting in the stable.
-	var horse := Color(0.6, 0.36, 0.18)
-	draw_rect(Rect2(hx + 262.0, g - 66.0, 86.0, 34.0), horse)
-	draw_rect(Rect2(hx + 268.0, g - 34.0, 10.0, 34.0), horse)
-	draw_rect(Rect2(hx + 332.0, g - 34.0, 10.0, 34.0), horse)
-	draw_colored_polygon(PackedVector2Array([Vector2(hx + 336.0, g - 66.0), Vector2(hx + 366.0, g - 100.0), Vector2(hx + 384.0, g - 84.0), Vector2(hx + 350.0, g - 50.0)]), horse)
-	draw_line(Vector2(hx + 338.0, g - 68.0), Vector2(hx + 364.0, g - 100.0), Color(0.25, 0.14, 0.08), 6.0)
 	# House.
 	draw_rect(Rect2(hx, g - 170.0, 220.0, 170.0), Color(0.95, 0.9, 0.78))
 	draw_colored_polygon(PackedVector2Array([Vector2(hx - 20.0, g - 170.0), Vector2(hx + 110.0, g - 262.0), Vector2(hx + 240.0, g - 170.0)]), Color(0.75, 0.3, 0.25))

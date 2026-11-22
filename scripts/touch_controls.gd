@@ -43,9 +43,11 @@ func _visible(id: String) -> bool:
 	if game == null or game.input_locked():
 		return false
 	if id == "shield":
-		return game.has_shield()
+		return game.has_shield() and not game.player.mounted
 	if id == "interact":
 		return game.context_action != ""
+	if game.player.mounted and (id == "strike" or id == "fireball"):
+		return false  # no attacks from the saddle
 	return true
 
 
@@ -153,8 +155,9 @@ func _draw() -> void:
 				_label(c + Vector2(0.0, r * 0.62), "SHIELD")
 				_cooldown(c, r, game.player.shield_cd / game.player.SHIELD_COOLDOWN, Color(0.6, 0.85, 1.0))
 			"interact":
-				var word := "TALK" if game.context_action == "talk" else "LOOK"
-				draw_string(font, Vector2(c.x - 60.0, c.y + 9.0), word, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 24, Color(1.0, 1.0, 1.0, 0.98))
+				var words := { "talk": "TALK", "boat": "LOOK", "ride": "RIDE", "dismount": "HOP OFF", "call": "CALL" }
+				var word: String = words.get(game.context_action, "")
+				draw_string(font, Vector2(c.x - 60.0, c.y + 8.0), word, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 24 if word.length() <= 4 else 19, Color(1.0, 1.0, 1.0, 0.98))
 
 
 ## Darkens a button and draws a ring that fills as the spell becomes ready again.

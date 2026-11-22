@@ -14,11 +14,12 @@ Step 2: all of Mission 1, "Goblin Trouble", in placeholder shapes. No art yet.
 - Five goblins in three camps. The first only swings, the second only charges, the third camp mixes both with one goblin attacking at a time.
 - Losing a fight restarts only that fight, with full health.
 - Returning to Merlin awards the Magic Shield, then opens practice fights of one to three goblins.
+- Spirit, Adeline's horse (dark brown, black mane and tail), waits in the stable. Tap Call and Spirit comes to her, tap Ride to gallop across the island, and Spirit stays back from goblin fights.
 
 Controls
 
 - Left thumb: the two arrows. Right thumb: Jump, Strike, Fire, and Shield once it is earned.
-- A Talk button appears when Adeline is next to Merlin or the boat.
+- One button above the arrows changes with the moment: Talk next to Merlin, Ride next to Spirit, Hop off in the saddle, Call everywhere else.
 - Keyboard for testing on a computer: A/D or arrows, Space, J, K, L and E.
 
 Combat numbers, all at the top of `scripts/player.gd` and `scripts/goblin.gd`
@@ -40,4 +41,5 @@ The newest one is always on the Releases page as `adeline.apk`.
 - `scripts/touch_controls.gd` is the on-screen buttons.
 - `scripts/hud.gd` is the hearts, objective, hints and title screen.
 - `scripts/dialog.gd` is the dialogue box and Merlin's mission list.
+- `scripts/horse.gd` is Spirit.
 - `.github/workflows/build-apk.yml` builds the app.

@@ -29,6 +29,11 @@ const SHIELD_COOLDOWN := 2.2
 
 const HURT_INVULN := 0.9
 
+# Riding Spirit: faster, with a longer jump. No attacks from the saddle.
+const RIDE_SPEED := 560.0
+const RIDE_JUMP := -820.0
+const RIDE_LIFT := 42.0  # how far Adeline sits above the ground
+
 # What take_hit reports back to an attacker.
 const MISSED := 0
 const HURT := 1
@@ -49,6 +54,7 @@ var knock := 0.0
 var coyote := 0.0
 var jump_buffer := 0.0
 var anim_time := 0.0
+var mounted := false
 var min_x := -INF
 var max_x := INF
 
@@ -78,6 +84,7 @@ func reset(at: Vector2) -> void:
 	block_flash = 0.0
 	invuln = 0.0
 	knock = 0.0
+	mounted = false
 
 
 func body_rect() -> Rect2:
@@ -112,6 +119,8 @@ func _physics_process(delta: float) -> void:
 	if dir != 0.0 and not is_striking():
 		facing = 1 if dir > 0.0 else -1
 	var speed := SPEED * (0.6 if is_striking() else 1.0)
+	if mounted:
+		speed = RIDE_SPEED
 	velocity.x = move_toward(velocity.x, dir * speed, ACCEL * delta)
 
 	if not locked:
@@ -134,11 +143,13 @@ func _read_actions(delta: float) -> void:
 	else:
 		jump_buffer = maxf(jump_buffer - delta, 0.0)
 	if jump_buffer > 0.0 and coyote > 0.0:
-		velocity.y = JUMP_VELOCITY
+		velocity.y = RIDE_JUMP if mounted else JUMP_VELOCITY
 		jump_buffer = 0.0
 		coyote = 0.0
 	if Input.is_action_just_released("jump") and velocity.y < -260.0:
 		velocity.y = -260.0  # letting go early makes a shorter hop
+	if mounted:
+		return
 
 	if Input.is_action_just_pressed("strike") and not is_striking():
 		strike_time = 0.0
@@ -214,6 +225,8 @@ func _draw() -> void:
 
 	if dead:
 		draw_set_transform(Vector2(0.0, -12.0), -f * PI / 2.0, Vector2.ONE)
+	elif mounted:
+		draw_set_transform(Vector2(0.0, -RIDE_LIFT), 0.0, Vector2.ONE)
 
 	var moving := absf(velocity.x) > 20.0 and is_on_floor()
 	var bob := sin(anim_time * 14.0) * 2.0 if moving else 0.0
@@ -225,9 +238,10 @@ func _draw() -> void:
 		Vector2(-f * (32.0 + sway), -26.0),
 		Vector2(-f * 8.0, -30.0),
 	]), cape)
-	# Legs and boots.
-	draw_rect(Rect2(-14.0, -42.0, 28.0, 34.0), jeans)
-	draw_rect(Rect2(-16.0, -10.0, 32.0, 10.0), boots)
+	# Legs and boots. In the saddle, Spirit's body covers them.
+	if not mounted:
+		draw_rect(Rect2(-14.0, -42.0, 28.0, 34.0), jeans)
+		draw_rect(Rect2(-16.0, -10.0, 32.0, 10.0), boots)
 	# Top.
 	draw_rect(Rect2(-16.0, -72.0 + bob, 32.0, 32.0), top)
 	# Hair, then head.
@@ -249,7 +263,7 @@ func _draw() -> void:
 	draw_line(hand, tip, Color(0.4, 0.26, 0.13), 5.0)
 	draw_circle(tip, 5.0 if not is_striking() else 8.0, Color(1.0, 0.9, 0.4))
 
-	if dead:
+	if dead or mounted:
 		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	# Shield bubble, and a bright ring when it blocks something.
