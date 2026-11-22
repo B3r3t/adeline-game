@@ -3,6 +3,7 @@ extends CharacterBody2D
 ## Timing, damage and reach numbers are at the top so they are easy to tune after playtests.
 
 const FireballScript := preload("res://scripts/fireball.gd")
+const RigScript := preload("res://scripts/rig.gd")
 
 const SPEED := 300.0
 const ACCEL := 2600.0
@@ -32,7 +33,6 @@ const HURT_INVULN := 0.9
 # Riding Spirit: faster, with a longer jump. No attacks from the saddle.
 const RIDE_SPEED := 560.0
 const RIDE_JUMP := -820.0
-const RIDE_LIFT := 42.0  # how far Adeline sits above the ground
 
 # What take_hit reports back to an attacker.
 const MISSED := 0
@@ -55,6 +55,8 @@ var coyote := 0.0
 var jump_buffer := 0.0
 var anim_time := 0.0
 var mounted := false
+var cast_time := 9.0  # seconds since the last fireball, for the casting pose
+var rig = null
 var min_x := -INF
 var max_x := INF
 
@@ -68,6 +70,10 @@ func _ready() -> void:
 	col.shape = shape
 	col.position = Vector2(0.0, -HEIGHT / 2.0)
 	add_child(col)
+	rig = Node2D.new()
+	rig.set_script(RigScript)
+	add_child(rig)
+	rig.build("res://art/adeline")
 
 
 func reset(at: Vector2) -> void:
@@ -101,6 +107,7 @@ func is_shielding() -> bool:
 
 func _physics_process(delta: float) -> void:
 	anim_time += delta
+	cast_time += delta
 	fireball_cd = maxf(fireball_cd - delta, 0.0)
 	shield_cd = maxf(shield_cd - delta, 0.0)
 	shield_time = maxf(shield_time - delta, 0.0)
@@ -133,6 +140,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	velocity.x = walk
 	position.x = clampf(position.x, min_x, max_x)
+	_animate()
 	queue_redraw()
 
 
@@ -182,12 +190,13 @@ func strike_rect() -> Rect2:
 
 func _cast_fireball() -> void:
 	fireball_cd = FIREBALL_COOLDOWN
+	cast_time = 0.0
 	var fb = Node2D.new()
 	fb.set_script(FireballScript)
 	fb.game = game
 	fb.direction = facing
 	fb.damage = FIREBALL_DAMAGE
-	fb.position = position + Vector2(facing * 34.0, -54.0)
+	fb.position = position + Vector2(facing * 44.0, -58.0)
 	game.add_projectile(fb)
 
 
@@ -212,65 +221,75 @@ func take_hit(from_x: float) -> int:
 	return HURT
 
 
-func _draw() -> void:
-	if invuln > 0.0 and not dead and int(anim_time * 16.0) % 2 == 0:
-		return  # blink while briefly protected after a hit
-	var f := float(facing)
-	var skin := Color(0.98, 0.84, 0.72)
-	var hair := Color(0.62, 0.25, 0.12)
-	var top := Color(0.2, 0.45, 0.9)
-	var jeans := Color(0.25, 0.33, 0.55)
-	var boots := Color(0.45, 0.28, 0.15)
-	var cape := Color(0.75, 0.2, 0.3)
+func _animate() -> void:
+	var t := anim_time
+	var sway := sin(t * 2.4)
+	var pose := { "cloak_back": 2.0 + sway * 2.0, "ponytail": sway * 3.0 }
+	rig.root_offset = Vector2.ZERO
+	rig.root_angle = 0.0
+	rig.scale.x = facing
+	rig.visible = not (invuln > 0.0 and not dead and int(t * 16.0) % 2 == 0)
 
 	if dead:
-		draw_set_transform(Vector2(0.0, -12.0), -f * PI / 2.0, Vector2.ONE)
+		# Lying down for a rest.
+		rig.root_angle = -PI / 2.0
+		rig.root_offset = Vector2(-10.0, -rig.rest_pos("torso").y - 12.0)
 	elif mounted:
-		draw_set_transform(Vector2(0.0, -RIDE_LIFT), 0.0, Vector2.ONE)
+		var pace := clampf(absf(velocity.x) / RIDE_SPEED, 0.0, 1.0)
+		pose["leg_near"] = -62.0
+		pose["leg_far"] = -62.0
+		pose["arm"] = -8.0
+		pose["cloak_back"] = 4.0 + pace * 22.0 + sway * 3.0
+		pose["ponytail"] = pace * 18.0 + sway * 3.0
+		rig.root_offset = game.horse.seat() - rig.rest_pos("torso")
+	elif not is_on_floor():
+		var falling := velocity.y > 0.0
+		pose["leg_near"] = -30.0
+		pose["leg_far"] = 24.0
+		pose["cloak_back"] = 34.0 if falling else 16.0
+		pose["ponytail"] = 26.0 if falling else 10.0
+		pose["arm"] = -20.0
+	elif absf(velocity.x) > 20.0:
+		var step := sin(t * 12.0)
+		pose["leg_near"] = step * 28.0
+		pose["leg_far"] = -step * 28.0
+		pose["arm"] = -step * 6.0
+		pose["cloak_back"] = 12.0 + step * 3.0
+		pose["ponytail"] = 10.0 + step * 3.0
+		rig.root_offset.y = -absf(cos(t * 12.0)) * 2.0
 
-	var moving := absf(velocity.x) > 20.0 and is_on_floor()
-	var bob := sin(anim_time * 14.0) * 2.0 if moving else 0.0
-	var sway := sin(anim_time * (10.0 if moving else 3.0)) * 5.0
+	# Actions take over the wand arm. The cloak sweeps back so the swing reads clearly.
+	if not dead and not mounted:
+		if is_striking():
+			var k := clampf(strike_time / (STRIKE_WINDUP + STRIKE_ACTIVE), 0.0, 1.0)
+			pose["arm"] = lerpf(-105.0, 45.0, k)
+			pose["torso"] = lerpf(-4.0, 8.0, k)
+			pose["cloak_back"] = 20.0
+		elif cast_time < 0.25:
+			pose["arm"] = 32.0
+			pose["torso"] = 5.0
+			pose["cloak_back"] = 18.0
+		elif is_shielding():
+			pose["arm"] = -70.0
+		if invuln > HURT_INVULN - 0.3:
+			pose["torso"] = -12.0
+			pose["head"] = 10.0
+	rig.pose = pose
+	rig.apply()
 
-	# Cape, behind everything else.
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(-f * 10.0, -70.0 + bob),
-		Vector2(-f * (32.0 + sway), -26.0),
-		Vector2(-f * 8.0, -30.0),
-	]), cape)
-	# Legs and boots. In the saddle, Spirit's body covers them.
-	if not mounted:
-		draw_rect(Rect2(-14.0, -42.0, 28.0, 34.0), jeans)
-		draw_rect(Rect2(-16.0, -10.0, 32.0, 10.0), boots)
-	# Top.
-	draw_rect(Rect2(-16.0, -72.0 + bob, 32.0, 32.0), top)
-	# Hair, then head.
-	draw_circle(Vector2(-f * 4.0, -84.0 + bob), 15.0, hair)
-	draw_circle(Vector2(f * 1.0, -82.0 + bob), 12.0, skin)
-	draw_circle(Vector2(f * 6.0, -84.0 + bob), 2.0, Color(0.3, 0.2, 0.12))
 
-	# Wand.
-	var hand := Vector2(f * 16.0, -54.0 + bob)
-	var angle := -0.9  # resting angle, pointing up and forward
-	if is_striking():
+func _draw() -> void:
+	# Effects only. Adeline herself is the rig.
+	if is_striking() and not dead:
 		var total := STRIKE_WINDUP + STRIKE_ACTIVE
-		var t := clampf(strike_time / total, 0.0, 1.0)
-		angle = lerpf(-1.9, 0.7, t)
 		if strike_time >= STRIKE_WINDUP and strike_time < total:
-			# Show the reach of the swing so it is easy to learn.
-			draw_arc(hand, STRIKE_REACH - 22.0, -1.3 if f > 0.0 else PI - 0.7, 0.7 if f > 0.0 else PI + 1.3, 12, Color(1.0, 1.0, 1.0, 0.75), 8.0)
-	var tip := hand + Vector2(cos(angle) * f, sin(angle)) * 34.0
-	draw_line(hand, tip, Color(0.4, 0.26, 0.13), 5.0)
-	draw_circle(tip, 5.0 if not is_striking() else 8.0, Color(1.0, 0.9, 0.4))
-
-	if dead or mounted:
-		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-
-	# Shield bubble, and a bright ring when it blocks something.
-	var centre := Vector2(0.0, -HEIGHT / 2.0)
+			var f := float(facing)
+			var hand := Vector2(f * 18.0, -58.0)
+			draw_arc(hand, STRIKE_REACH - 20.0, -1.3 if f > 0.0 else PI - 0.7, 0.7 if f > 0.0 else PI + 1.3, 12, Color(1.0, 1.0, 1.0, 0.8), 8.0)
+	var centre := Vector2(0.0, -HEIGHT / 2.0 - 6.0)
 	if is_shielding():
-		draw_circle(centre, 62.0, Color(0.45, 0.75, 1.0, 0.28))
-		draw_arc(centre, 62.0, 0.0, TAU, 40, Color(0.7, 0.9, 1.0, 0.9), 5.0)
+		draw_circle(centre, 66.0, Color(0.45, 0.75, 1.0, 0.28))
+		draw_arc(centre, 66.0, 0.0, TAU, 40, Color(0.7, 0.9, 1.0, 0.9), 5.0)
 	if block_flash > 0.0:
-		var grow := 62.0 + (0.35 - block_flash) * 120.0
+		var grow := 66.0 + (0.35 - block_flash) * 120.0
 		draw_arc(centre, grow, 0.0, TAU, 40, Color(1.0, 1.0, 1.0, block_flash / 0.35), 8.0)

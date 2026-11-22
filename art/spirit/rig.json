@@ -1,0 +1,83 @@
+{
+ "tex_scale": 0.45454545454545453,
+ "parts": [
+  {
+   "name": "body",
+   "parent": "",
+   "z": 2,
+   "pos": [
+    0.0,
+    -69.93
+   ],
+   "pivot": [
+    142.1,
+    176.16
+   ]
+  },
+  {
+   "name": "tail",
+   "parent": "body",
+   "z": 0,
+   "pos": [
+    -60.85,
+    -27.76
+   ],
+   "pivot": [
+    82.21,
+    8.22
+   ]
+  },
+  {
+   "name": "leg_hind_far",
+   "parent": "body",
+   "z": 1,
+   "pos": [
+    -42.7,
+    -1.6
+   ],
+   "pivot": [
+    50.5,
+    17.62
+   ]
+  },
+  {
+   "name": "leg_front_far",
+   "parent": "body",
+   "z": 1,
+   "pos": [
+    20.28,
+    -3.74
+   ],
+   "pivot": [
+    23.49,
+    16.44
+   ]
+  },
+  {
+   "name": "leg_hind_near",
+   "parent": "body",
+   "z": 3,
+   "pos": [
+    -49.64,
+    0.0
+   ],
+   "pivot": [
+    50.5,
+    17.62
+   ]
+  },
+  {
+   "name": "leg_front_near",
+   "parent": "body",
+   "z": 3,
+   "pos": [
+    14.41,
+    -2.14
+   ],
+   "pivot": [
+    23.49,
+    16.44
+   ]
+  }
+ ]
+}

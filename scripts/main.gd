@@ -17,8 +17,8 @@ const LEVEL_RIGHT := 5400.0
 const CAMERA_ZOOM := 1.4  # bigger characters are easier to read on an 8 inch screen
 
 const HOUSE_X := 150.0
-const STABLE_X := 470.0  # where Spirit waits
-const START_X := 660.0
+const STABLE_X := 485.0  # where Spirit waits
+const START_X := 700.0
 const MERLIN_X := 1280.0
 const SIGN_X := 1560.0
 const GATE_X := 1700.0  # Adeline cannot head east until she has the mission
@@ -640,9 +640,9 @@ func _draw() -> void:
 func _draw_house(g: float) -> void:
 	var hx := HOUSE_X
 	# Stable, attached to the right side of the house.
-	draw_rect(Rect2(hx + 220.0, g - 120.0, 200.0, 120.0), Color(0.55, 0.38, 0.22))
-	draw_rect(Rect2(hx + 236.0, g - 100.0, 168.0, 100.0), Color(0.25, 0.17, 0.1))
-	draw_rect(Rect2(hx + 212.0, g - 134.0, 216.0, 14.0), Color(0.4, 0.26, 0.15))
+	draw_rect(Rect2(hx + 220.0, g - 176.0, 230.0, 176.0), Color(0.55, 0.38, 0.22))
+	draw_rect(Rect2(hx + 236.0, g - 158.0, 198.0, 158.0), Color(0.25, 0.17, 0.1))
+	draw_rect(Rect2(hx + 212.0, g - 190.0, 246.0, 14.0), Color(0.4, 0.26, 0.15))
 	# House.
 	draw_rect(Rect2(hx, g - 170.0, 220.0, 170.0), Color(0.95, 0.9, 0.78))
 	draw_colored_polygon(PackedVector2Array([Vector2(hx - 20.0, g - 170.0), Vector2(hx + 110.0, g - 262.0), Vector2(hx + 240.0, g - 170.0)]), Color(0.75, 0.3, 0.25))

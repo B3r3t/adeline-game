@@ -1,10 +1,12 @@
 extends Node2D
 ## Spirit, Adeline's horse: dark brown with a black mane and tail.
 ## Spirit waits in the stable, comes when called, carries Adeline at a gallop,
-## and stays back from goblin fights. Placeholder shapes for now.
+## and stays back from goblin fights. Built from cutout art.
+
+const RigScript := preload("res://scripts/rig.gd")
 
 const GALLOP := 620.0
-const BACK_HEIGHT := 78.0  # how high Spirit's back is above the ground
+const SEAT := Vector2(-32.0, -27.0)  # the dip of Spirit's back, measured from the body joint
 const NAME := "Spirit"
 
 var game = null
@@ -15,10 +17,32 @@ var target_x := 0.0
 var speed := 0.0  # ground speed, drives the leg animation
 var stride := 0.0
 var clock := 0.0
+var rig = null
+var rider_leg: Sprite2D
 
 
 func _ready() -> void:
 	font = ThemeDB.fallback_font
+	rig = Node2D.new()
+	rig.set_script(RigScript)
+	add_child(rig)
+	rig.build("res://art/spirit")
+	# The far legs sit in shadow.
+	rig.tint("leg_front_far", Color(0.72, 0.72, 0.78))
+	rig.tint("leg_hind_far", Color(0.72, 0.72, 0.78))
+	# Borrow Adeline's leg art for the rider's near leg.
+	var adeline = JSON.parse_string(FileAccess.get_file_as_string("res://art/adeline/rig.json"))
+	rider_leg = Sprite2D.new()
+	rider_leg.texture = load("res://art/adeline/leg_near.png")
+	rider_leg.centered = false
+	for part in adeline["parts"]:
+		if part["name"] == "leg_near":
+			rider_leg.offset = -Vector2(part["pivot"][0], part["pivot"][1])
+	var s := float(adeline["tex_scale"])
+	rider_leg.scale = Vector2(s, s)
+	rider_leg.rotation = deg_to_rad(-34.0)
+	rider_leg.visible = false
+	rig.add_child(rider_leg)
 
 
 func place(x: float) -> void:
@@ -64,6 +88,7 @@ func _physics_process(delta: float) -> void:
 		_:
 			speed = move_toward(speed, 0.0, 2400.0 * delta)
 	stride += speed * delta * 0.035
+	_animate()
 	queue_redraw()
 
 
@@ -79,64 +104,31 @@ func _move_to(x: float, pace: float, delta: float) -> bool:
 	return false
 
 
-func _draw() -> void:
-	var f := float(facing)
-	var coat := Color(0.34, 0.2, 0.11)
-	var coat_far := Color(0.26, 0.15, 0.08)
-	var black := Color(0.07, 0.06, 0.06)
+func _animate() -> void:
 	var pace := clampf(speed / 560.0, 0.0, 1.0)
-	var bob := sin(stride * 2.0) * 4.0 * pace
-	var top := -BACK_HEIGHT + bob
+	rig.scale.x = facing
+	rig.pose = {
+		"leg_front_near": sin(stride) * 34.0 * pace,
+		"leg_front_far": sin(stride + 0.8) * 34.0 * pace,
+		"leg_hind_near": sin(stride + PI) * 30.0 * pace,
+		"leg_hind_far": sin(stride + PI + 0.8) * 30.0 * pace,
+		"tail": sin(clock * 2.0) * 5.0 + pace * 26.0,
+		"body": sin(stride * 2.0) * 2.5 * pace,
+	}
+	rig.root_offset = Vector2(0.0, -absf(sin(stride)) * 5.0 * pace)
+	rig.apply()
+	# Adeline's near leg, drawn over Spirit's side while she rides.
+	rider_leg.visible = state == "mounted"
+	rider_leg.position = seat() + Vector2(2.0, 2.0)
 
-	# Tail.
-	var sway := sin(clock * 3.0) * 4.0 + pace * 16.0
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(-f * 58.0, top + 6.0),
-		Vector2(-f * (86.0 + sway), top + 34.0),
-		Vector2(-f * (72.0 + sway * 0.5), top + 58.0),
-		Vector2(-f * 56.0, top + 22.0),
-	]), black)
 
-	# Legs: the far pair first, then the near pair.
-	for i in 4:
-		var hind := i % 2 == 0
-		var far := i < 2
-		var base_x := (-42.0 if hind else 42.0) * f + (7.0 if far else -5.0) * f
-		var phase := stride + (0.0 if hind else PI) + (PI * 0.5 if far else 0.0)
-		var swing := sin(phase) * 24.0 * pace
-		var lift := maxf(cos(phase), 0.0) * 16.0 * pace
-		var hip := Vector2(base_x, top + 34.0)
-		var hoof := Vector2(base_x + swing * f, -lift)
-		draw_line(hip, hoof, coat_far if far else coat, 10.0)
-		draw_rect(Rect2(hoof.x - 6.0, hoof.y - 8.0, 12.0, 8.0), black)
+## Where a rider sits, relative to Spirit's feet and facing right.
+func seat() -> Vector2:
+	return rig.rest_pos("body") + rig.root_offset + SEAT
 
-	# Body.
-	draw_rect(Rect2(-54.0, top, 108.0, 40.0), coat)
-	draw_circle(Vector2(-f * 50.0, top + 20.0), 21.0, coat)
-	draw_circle(Vector2(f * 50.0, top + 20.0), 21.0, coat)
-	# Neck and head.
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(f * 34.0, top + 2.0), Vector2(f * 66.0, top + 26.0),
-		Vector2(f * 92.0, top - 40.0), Vector2(f * 68.0, top - 56.0),
-	]), coat)
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(f * 68.0, top - 58.0), Vector2(f * 90.0, top - 54.0), Vector2(f * 118.0, top - 26.0),
-		Vector2(f * 110.0, top - 14.0), Vector2(f * 84.0, top - 26.0),
-	]), coat)
-	draw_colored_polygon(PackedVector2Array([Vector2(f * 70.0, top - 56.0), Vector2(f * 74.0, top - 76.0), Vector2(f * 82.0, top - 56.0)]), coat)
-	draw_circle(Vector2(f * 112.0, top - 20.0), 3.0, black)
-	draw_circle(Vector2(f * 92.0, top - 42.0), 3.0, black)
-	# Mane and forelock.
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(f * 30.0, top + 2.0), Vector2(f * 62.0, top - 58.0),
-		Vector2(f * 72.0, top - 54.0), Vector2(f * 50.0, top - 8.0), Vector2(f * 44.0, top + 8.0),
-	]), black)
-	draw_colored_polygon(PackedVector2Array([Vector2(f * 72.0, top - 58.0), Vector2(f * 90.0, top - 50.0), Vector2(f * 80.0, top - 44.0)]), black)
 
-	if state == "mounted":
-		# Adeline's near leg and boot over Spirit's side.
-		draw_rect(Rect2(-8.0 + f * 4.0, top + 2.0, 16.0, 34.0), Color(0.25, 0.33, 0.55))
-		draw_rect(Rect2(-10.0 + f * 7.0, top + 34.0, 22.0, 10.0), Color(0.45, 0.28, 0.15))
-	elif game.mode == "play" and absf(game.player.position.x - position.x) < 240.0:
-		draw_string_outline(font, Vector2(-60.0, top - 92.0), NAME, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 20, 5, Color(0.0, 0.0, 0.0, 0.5))
-		draw_string(font, Vector2(-60.0, top - 92.0), NAME, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 20, Color.WHITE)
+func _draw() -> void:
+	if state != "mounted" and game.mode == "play" and absf(game.player.position.x - position.x) < 260.0:
+		var y := -170.0
+		draw_string_outline(font, Vector2(-60.0, y), NAME, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 20, 5, Color(0.0, 0.0, 0.0, 0.5))
+		draw_string(font, Vector2(-60.0, y), NAME, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 20, Color.WHITE)

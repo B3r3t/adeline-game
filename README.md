@@ -6,7 +6,7 @@ Play as Adeline: fight goblins with her wand, earn spells, and rescue her parent
 
 ## Where things stand
 
-Step 2: all of Mission 1, "Goblin Trouble", in placeholder shapes. No art yet.
+Step 3: all of Mission 1, "Goblin Trouble", with real art for Adeline and Spirit.
 
 - Title screen with Start, Continue and New game. Progress saves on its own.
 - The home island as one long strip: house and stable, Merlin's hut, three goblin camps, the river and the boat.
@@ -27,6 +27,20 @@ Combat numbers, all at the top of `scripts/player.gd` and `scripts/goblin.gd`
 - Wand strike: 1 damage, very quick.
 - Fireball: 3 damage, 2 seconds between casts.
 - Goblin: 8 health. Each attack warns for 0.9 seconds, then recovers for about a second.
+
+## Art
+
+The look is a cartoon with thick ink outlines. Adeline is a 12-year-old girl with auburn hair,
+a purple hooded cloak and swirl-patterned boots. Spirit is her dark brown horse.
+
+Adeline and Spirit are real art now, built as paper-puppet rigs: each is a set of separate
+parts (head, arm, legs, cloak, tail and so on) that the game rotates at the joints.
+Merlin, the goblins and the buildings are still stand-in shapes.
+
+- `art/adeline` and `art/spirit` hold the game textures and a `rig.json` that lists the joints.
+- `art_src` holds the original parts and `build_rig.py`, which turns them into the game files.
+  Godot ignores this folder. Joint positions and part sizes are at the top of that script.
+- `scripts/rig.gd` assembles a rig. The poses live in `scripts/player.gd` and `scripts/horse.gd`.
 
 ## Getting the game onto a tablet
 
