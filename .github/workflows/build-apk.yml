@@ -98,8 +98,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete latest --yes --cleanup-tag || true
-          gh release create latest build/adeline.apk \
-            --target "$GITHUB_SHA" \
-            --title "Latest build (0.1.${GITHUB_RUN_NUMBER})" \
-            --notes "Newest playable build of Adeline. Download adeline.apk on the tablet and tap it to install."
+          title="Latest build (0.1.${GITHUB_RUN_NUMBER})"
+          if gh release view latest >/dev/null 2>&1; then
+            # Reuse the one release so its download link never goes missing mid-update.
+            gh release upload latest build/adeline.apk --clobber
+            gh release edit latest --title "$title" --draft=false
+          else
+            gh release create latest build/adeline.apk \
+              --target "$GITHUB_SHA" \
+              --title "$title" \
+              --notes "Newest playable build of Adeline. Download adeline.apk on the tablet and tap it to install."
+          fi
