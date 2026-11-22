@@ -2,6 +2,7 @@ extends Control
 ## On-screen buttons for two thumbs. Each finger is tracked on its own, so
 ## moving and attacking at the same time works. The buttons sit in the bottom
 ## corners with a margin, because a kids' case covers the screen edge.
+## New buttons (shield, talk) appear without moving the ones already learned.
 
 const EDGE_MARGIN := 44.0
 const TOUCH_FORGIVENESS := 1.3  # buttons react a little outside their drawn edge
@@ -24,20 +25,36 @@ func _ready() -> void:
 func _layout() -> void:
 	var s := get_viewport_rect().size
 	var m := EDGE_MARGIN
+	var right := s.x - m
+	var bottom := s.y - m
 	buttons = {
-		"left": { "center": Vector2(m + 82.0, s.y - m - 82.0), "radius": 82.0, "action": "move_left" },
-		"right": { "center": Vector2(m + 82.0 + 180.0, s.y - m - 82.0), "radius": 82.0, "action": "move_right" },
-		"jump": { "center": Vector2(s.x - m - 80.0, s.y - m - 80.0), "radius": 80.0, "action": "jump" },
-		"strike": { "center": Vector2(s.x - m - 80.0 - 176.0, s.y - m - 72.0), "radius": 72.0, "action": "strike" },
-		"fireball": { "center": Vector2(s.x - m - 80.0 - 70.0, s.y - m - 80.0 - 170.0), "radius": 72.0, "action": "fireball" },
+		"left": { "center": Vector2(m + 70.0, bottom - 70.0), "radius": 70.0, "action": "move_left" },
+		"right": { "center": Vector2(m + 70.0 + 156.0, bottom - 70.0), "radius": 70.0, "action": "move_right" },
+		"jump": { "center": Vector2(right - 68.0, bottom - 68.0), "radius": 68.0, "action": "jump" },
+		"strike": { "center": Vector2(right - 68.0 - 150.0, bottom - 62.0), "radius": 62.0, "action": "strike" },
+		"fireball": { "center": Vector2(right - 68.0 - 58.0, bottom - 68.0 - 146.0), "radius": 62.0, "action": "fireball" },
+		"shield": { "center": Vector2(right - 68.0 - 200.0, bottom - 62.0 - 138.0), "radius": 58.0, "action": "shield" },
+		"interact": { "center": Vector2(m + 70.0 + 78.0, bottom - 70.0 - 150.0), "radius": 60.0, "action": "interact" },
 	}
 	queue_redraw()
+
+
+func _visible(id: String) -> bool:
+	if game == null or game.input_locked():
+		return false
+	if id == "shield":
+		return game.has_shield()
+	if id == "interact":
+		return game.context_action != ""
+	return true
 
 
 func _button_at(pos: Vector2) -> String:
 	var best := ""
 	var best_d := INF
 	for id in buttons:
+		if not _visible(id):
+			continue
 		var b: Dictionary = buttons[id]
 		var d: float = pos.distance_to(b["center"])
 		if d <= b["radius"] * TOUCH_FORGIVENESS and d < best_d:
@@ -80,7 +97,8 @@ func _sync() -> void:
 	queue_redraw()
 
 
-func _release_all() -> void:
+## Lets go of every button. Used when a dialogue opens or the app loses focus.
+func release_all() -> void:
 	fingers.clear()
 	_sync()
 
@@ -88,20 +106,30 @@ func _release_all() -> void:
 func _notification(what: int) -> void:
 	# Leaving the app or losing focus must never leave a button stuck down.
 	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_WM_WINDOW_FOCUS_OUT:
-		_release_all()
+		release_all()
 
 
 func _process(_delta: float) -> void:
-	queue_redraw()  # keeps the fireball cooldown ring moving
+	# A button that disappears while held must be released.
+	for index in fingers.keys():
+		if not _visible(fingers[index]):
+			fingers.erase(index)
+			_sync()
+	queue_redraw()  # keeps the cooldown rings moving
 
 
 func _draw() -> void:
 	for id in buttons:
+		if not _visible(id):
+			continue
 		var b: Dictionary = buttons[id]
 		var c: Vector2 = b["center"]
 		var r: float = b["radius"]
 		var down: bool = held.has(id)
-		draw_circle(c, r, Color(1.0, 1.0, 1.0, 0.42 if down else 0.2))
+		var fill := Color(1.0, 1.0, 1.0, 0.42 if down else 0.2)
+		if id == "interact":
+			fill = Color(1.0, 0.85, 0.3, 0.6 if down else 0.4)
+		draw_circle(c, r, fill)
 		draw_arc(c, r, 0.0, TAU, 48, Color(1.0, 1.0, 1.0, 0.75), 4.0)
 		match id:
 			"left":
@@ -119,11 +147,22 @@ func _draw() -> void:
 				draw_circle(c + Vector2(0.0, -r * 0.14), r * 0.3, Color(1.0, 0.45, 0.1))
 				draw_circle(c + Vector2(0.0, -r * 0.14), r * 0.17, Color(1.0, 0.85, 0.3))
 				_label(c + Vector2(0.0, r * 0.6), "FIRE")
-				if game != null and game.player != null:
-					var cd: float = game.player.fireball_cd / game.player.FIREBALL_COOLDOWN
-					if cd > 0.0:
-						draw_circle(c, r, Color(0.0, 0.0, 0.0, 0.35))
-						draw_arc(c, r - 8.0, -PI / 2.0, -PI / 2.0 + TAU * (1.0 - cd), 32, Color(1.0, 0.8, 0.3), 8.0)
+				_cooldown(c, r, game.player.fireball_cd / game.player.FIREBALL_COOLDOWN, Color(1.0, 0.8, 0.3))
+			"shield":
+				draw_arc(c + Vector2(0.0, -r * 0.12), r * 0.32, 0.0, TAU, 24, Color(0.6, 0.85, 1.0), 6.0)
+				_label(c + Vector2(0.0, r * 0.62), "SHIELD")
+				_cooldown(c, r, game.player.shield_cd / game.player.SHIELD_COOLDOWN, Color(0.6, 0.85, 1.0))
+			"interact":
+				var word := "TALK" if game.context_action == "talk" else "LOOK"
+				draw_string(font, Vector2(c.x - 60.0, c.y + 9.0), word, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 24, Color(1.0, 1.0, 1.0, 0.98))
+
+
+## Darkens a button and draws a ring that fills as the spell becomes ready again.
+func _cooldown(c: Vector2, r: float, left: float, color: Color) -> void:
+	if left <= 0.0:
+		return
+	draw_circle(c, r, Color(0.0, 0.0, 0.0, 0.35))
+	draw_arc(c, r - 8.0, -PI / 2.0, -PI / 2.0 + TAU * (1.0 - left), 32, color, 8.0)
 
 
 func _triangle(c: Vector2, dir: float, half: float) -> void:
@@ -135,4 +174,4 @@ func _triangle(c: Vector2, dir: float, half: float) -> void:
 
 
 func _label(pos: Vector2, text: String) -> void:
-	draw_string(font, Vector2(pos.x - 60.0, pos.y + 6.0), text, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 18, Color(1.0, 1.0, 1.0, 0.95))
+	draw_string(font, Vector2(pos.x - 60.0, pos.y + 6.0), text, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 17, Color(1.0, 1.0, 1.0, 0.95))

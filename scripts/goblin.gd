@@ -6,7 +6,7 @@ enum State { APPROACH, SWING_WINDUP, SWING_ACTIVE, CHARGE_WINDUP, CHARGE_ACTIVE,
 
 const WIDTH := 40.0
 const HEIGHT := 56.0
-const MAX_HEALTH := 6
+const MAX_HEALTH := 8
 const WALK_SPEED := 140.0
 const GRAVITY := 1900.0
 
@@ -40,6 +40,9 @@ var knock := 0.0
 var fade := 1.0
 var anim_time := 0.0
 var hold_slot := 0  # where to wait when another goblin is attacking
+var attacks := "both"  # "swing", "charge" or "both", so each attack can be taught on its own
+var min_x := -INF
+var max_x := INF
 
 
 func _ready() -> void:
@@ -95,7 +98,10 @@ func _physics_process(delta: float) -> void:
 				_set_state(State.SWING_ACTIVE)
 		State.SWING_ACTIVE:
 			if not hit_done and swing_rect().intersects(game.player.body_rect()):
-				hit_done = game.player.take_hit(position.x)
+				var result: int = game.player.take_hit(position.x)
+				hit_done = result != 0
+				if result == 2:
+					knock = -facing * 260.0  # bounced off the shield
 			if state_time >= SWING_ACTIVE:
 				recovery_length = SWING_RECOVERY
 				_set_state(State.RECOVERY)
@@ -106,9 +112,14 @@ func _physics_process(delta: float) -> void:
 				_set_state(State.CHARGE_ACTIVE)
 		State.CHARGE_ACTIVE:
 			velocity.x = facing * CHARGE_SPEED  # direction is locked, no tracking
+			var bounced := false
 			if not hit_done and body_rect().intersects(game.player.body_rect()):
-				hit_done = game.player.take_hit(position.x - facing * 10.0)
-			if state_time >= CHARGE_TIME or (is_on_wall() and state_time > 0.05):
+				var result: int = game.player.take_hit(position.x - facing * 10.0)
+				hit_done = result != 0
+				if result == 2:
+					knock = -facing * 320.0  # bounced off the shield
+					bounced = true
+			if bounced or state_time >= CHARGE_TIME or (is_on_wall() and state_time > 0.05):
 				recovery_length = CHARGE_RECOVERY
 				_set_state(State.RECOVERY)
 		State.RECOVERY:
@@ -123,6 +134,7 @@ func _physics_process(delta: float) -> void:
 
 	velocity.x += knock
 	move_and_slide()
+	position.x = clampf(position.x, min_x, max_x)
 	queue_redraw()
 
 
@@ -130,11 +142,14 @@ func _approach(dist: float, toward: int) -> void:
 	if game.player.dead:
 		return
 	var may_attack: bool = think <= 0.0 and game.can_attack(self)
-	if may_attack and dist <= SWING_RANGE:
+	var can_swing := attacks != "charge"
+	var can_charge := attacks != "swing"
+	var charge_min := CHARGE_MIN_RANGE if can_swing else 60.0
+	if may_attack and can_swing and dist <= SWING_RANGE:
 		if game.request_attack(self):
 			_set_state(State.SWING_WINDUP)
 			return
-	if may_attack and dist >= CHARGE_MIN_RANGE and dist <= CHARGE_MAX_RANGE:
+	if may_attack and can_charge and dist >= charge_min and dist <= CHARGE_MAX_RANGE:
 		if game.request_attack(self):
 			_set_state(State.CHARGE_WINDUP)
 			return
