@@ -6,7 +6,7 @@ Play as Adeline: fight goblins with her wand, earn spells, and rescue her parent
 
 ## Where things stand
 
-Step 3: all of Mission 1, "Goblin Trouble", with real art for Adeline and Spirit.
+Step 3: all of Mission 1, "Goblin Trouble", in real art.
 
 - Title screen with Start, Continue and New game. Progress saves on its own.
 - The home island as one long strip: house and stable, Merlin's hut, three goblin camps, the river and the boat.
@@ -33,16 +33,21 @@ Combat numbers, all at the top of `scripts/player.gd` and `scripts/goblin.gd`
 The look is a cartoon with thick ink outlines. Adeline is a 12-year-old girl with auburn hair,
 a purple hooded cloak and swirl-patterned boots. Spirit is her dark brown horse.
 
-Adeline and Spirit are real art now, built as paper-puppet rigs: each is a set of separate
-parts (head, arm, legs, cloak, tail and so on) that the game rotates at the joints.
-The farmhouse with Spirit's stable, Merlin's hut, the flying boat and Merlin himself are real art too,
-placed as single pictures. The goblins, the signpost, the goblin camps and the ground are still stand-in shapes.
+All of Mission 1 is in real art now.
 
-- `art/adeline` and `art/spirit` hold the game textures and a `rig.json` that lists the joints.
-- `art/props` holds the scenery and Merlin. `art_src/build_props.py` sets how tall each one is in the game.
+- Adeline, Spirit and the goblins are paper-puppet rigs: each is a set of separate parts
+  (head, arm, legs, cloak, tail, club and so on) that the game rotates at the joints.
+- The farmhouse with Spirit's stable, Merlin's hut, Merlin, the flying boat, the signpost
+  and the goblin camps are single pictures.
+- The ground and the two layers of hills are long strips that repeat sideways. The hills are
+  faded toward the sky colour so the characters stand out in front of them.
+- Still plain shapes: the river water, the fireball, the hearts and the buttons.
+
+- `art/adeline`, `art/spirit` and `art/goblin` hold the game textures and a `rig.json` that lists the joints.
+- `art/props` holds the scenery and Merlin. `art_src/build_props.py` sets how tall each one is in the game and how much the hills fade.
 - `art_src` holds the original parts and `build_rig.py`, which turns them into the game files.
   Godot ignores this folder. Joint positions and part sizes are at the top of that script.
-- `scripts/rig.gd` assembles a rig. The poses live in `scripts/player.gd` and `scripts/horse.gd`.
+- `scripts/rig.gd` assembles a rig. The poses live in `scripts/player.gd`, `scripts/horse.gd` and `scripts/goblin.gd`.
 
 ## Getting the game onto a tablet
 

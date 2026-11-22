@@ -5,7 +5,6 @@ extends Node2D
 
 const PlayerScript := preload("res://scripts/player.gd")
 const GoblinScript := preload("res://scripts/goblin.gd")
-const HillsScript := preload("res://scripts/hills.gd")
 const HudScript := preload("res://scripts/hud.gd")
 const TouchScript := preload("res://scripts/touch_controls.gd")
 const DialogScript := preload("res://scripts/dialog.gd")
@@ -28,6 +27,9 @@ const TALK_RANGE := 120.0
 const RIDE_RANGE := 100.0
 const SAVE_PATH := "user://save.json"
 const ART_SCALE := 1.0 / 2.2  # scenery art is drawn at 2.2 pixels per world pixel
+const GROUND_ART_HEIGHT := 170.0  # how tall the grass-and-soil strip is in the world
+const GRASS_RISE := 24.0  # how far the grass tufts stand above the line characters walk on
+const STRIP_START := -3000.0
 
 # Five goblins in three camps. The first teaches the swing, the second the charge,
 # and the third mixes both with one goblin attacking at a time.
@@ -56,8 +58,10 @@ var boat: Sprite2D
 var goblins: Array = []
 var projectiles: Node2D
 var camera: Camera2D
-var hills_far: Node2D
-var hills_near: Node2D
+var hills_far: Sprite2D
+var hills_near: Sprite2D
+var ground_art: Texture2D
+var camps: Array = []
 var hud = null
 var controls = null
 var dialog = null
@@ -149,24 +153,28 @@ func _add_action(action: String, keys: Array) -> void:
 
 
 func _build_backdrop() -> void:
-	hills_far = Node2D.new()
-	hills_far.set_script(HillsScript)
-	hills_far.color = Color(0.62, 0.84, 0.72)
-	hills_far.base_y = GROUND_Y - 40.0
-	hills_far.amplitude = 190.0
-	hills_far.wavelength = 900.0
-	hills_far.z_index = -20
-	add_child(hills_far)
+	# Two layers of hills that slide past at different speeds for a feeling of depth.
+	hills_far = _add_strip("hills_far", 230.0, GROUND_Y + 24.0, -20)
+	hills_near = _add_strip("hills_near", 270.0, GROUND_Y + 14.0, -10)
+	ground_art = load("res://art/props/ground.png")
+	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 
-	hills_near = Node2D.new()
-	hills_near.set_script(HillsScript)
-	hills_near.color = Color(0.45, 0.75, 0.5)
-	hills_near.base_y = GROUND_Y - 10.0
-	hills_near.amplitude = 110.0
-	hills_near.wavelength = 520.0
-	hills_near.phase = 1.7
-	hills_near.z_index = -10
-	add_child(hills_near)
+
+## A long picture that repeats sideways, standing on the given line.
+func _add_strip(art: String, world_height: float, bottom_y: float, depth: int) -> Sprite2D:
+	var sprite := Sprite2D.new()
+	var tex: Texture2D = load("res://art/props/%s.png" % art)
+	sprite.texture = tex
+	sprite.centered = false
+	sprite.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	sprite.region_enabled = true
+	sprite.region_rect = Rect2(0.0, 0.0, tex.get_width() * 8.0, tex.get_height())
+	var k := world_height / tex.get_height()
+	sprite.scale = Vector2(k, k)
+	sprite.position = Vector2(STRIP_START, bottom_y - world_height)
+	sprite.z_index = depth
+	add_child(sprite)
+	return sprite
 
 
 func _build_ground() -> void:
@@ -181,6 +189,9 @@ func _build_scenery() -> void:
 	_add_scenery("hut", HUT_X, true)
 	merlin = _add_scenery("merlin", MERLIN_X, true)
 	boat = _add_scenery("boat", RIVER_X + 210.0, true)
+	_add_scenery("sign", SIGN_X, true)
+	for enc in ENCOUNTERS:
+		camps.append(_add_scenery("camp", float(enc["right"]) - 40.0, true))
 
 
 func _add_scenery(art: String, x: float, centred: bool) -> Sprite2D:
@@ -628,8 +639,11 @@ func _process(delta: float) -> void:
 	goblins = goblins.filter(func(g): return is_instance_valid(g))
 	camera.position = _camera_target()
 	var cam_x := camera.get_screen_center_position().x
-	hills_far.position.x = cam_x * 0.85
-	hills_near.position.x = cam_x * 0.6
+	hills_far.position.x = STRIP_START + cam_x * 0.85
+	hills_near.position.x = STRIP_START + cam_x * 0.6
+	# A goblin camp packs up once its goblins are beaten.
+	for n in camps.size():
+		camps[n].visible = n >= cleared()
 	# Merlin turns to face Adeline, and the boat hovers over the river.
 	merlin.flip_h = player.position.x < MERLIN_X
 	var boat_h := boat.texture.get_size().y * ART_SCALE
@@ -641,26 +655,15 @@ func _process(delta: float) -> void:
 
 func _draw() -> void:
 	var g := GROUND_Y
-	# Grass and dirt.
-	var left := LEVEL_LEFT - 400.0
-	var width := LEVEL_RIGHT - LEVEL_LEFT + 800.0
-	draw_rect(Rect2(left, g, width, 600.0), Color(0.42, 0.3, 0.2))
-	draw_rect(Rect2(left, g, width, 26.0), Color(0.36, 0.72, 0.3))
-	var x := LEVEL_LEFT
-	var i := 0
-	while x <= RIVER_X:
-		draw_circle(Vector2(x + 90.0, g + 60.0 + (i % 3) * 30.0), 10.0, Color(0.36, 0.25, 0.17))
-		draw_rect(Rect2(x + 30.0, g - 8.0, 5.0, 8.0), Color(0.3, 0.62, 0.26))
-		draw_rect(Rect2(x + 42.0, g - 12.0, 5.0, 12.0), Color(0.3, 0.62, 0.26))
-		x += 200.0
-		i += 1
-
+	var left := LEVEL_LEFT - 600.0
+	var width := LEVEL_RIGHT - LEVEL_LEFT + 1200.0
+	# Deep soil, then the repeating grass-and-soil strip on top of it.
+	draw_rect(Rect2(left, g + 100.0, width, 700.0), Color(0.33, 0.17, 0.1))
+	var k := GROUND_ART_HEIGHT / ground_art.get_height()
+	draw_set_transform(Vector2(left, g - GRASS_RISE), 0.0, Vector2(k, k))
+	draw_texture_rect(ground_art, Rect2(0.0, 0.0, width / k, ground_art.get_height()), true)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	_draw_merlin_mark(g)
-	_draw_sign(g)
-	for n in ENCOUNTERS.size():
-		if n >= cleared():
-			var enc: Dictionary = ENCOUNTERS[n]
-			_draw_camp(float(enc["right"]) - 60.0, g)
 	_draw_river(g)
 
 
@@ -670,22 +673,6 @@ func _draw_merlin_mark(g: float) -> void:
 		var bob := sin(clock * 4.0) * 5.0
 		draw_rect(Rect2(MERLIN_X - 5.0, g - 226.0 + bob, 10.0, 26.0), Color(1.0, 0.85, 0.2))
 		draw_circle(Vector2(MERLIN_X, g - 188.0 + bob), 6.0, Color(1.0, 0.85, 0.2))
-
-
-func _draw_sign(g: float) -> void:
-	draw_rect(Rect2(SIGN_X - 4.0, g - 96.0, 8.0, 96.0), Color(0.45, 0.3, 0.17))
-	draw_colored_polygon(PackedVector2Array([
-		Vector2(SIGN_X - 62.0, g - 110.0), Vector2(SIGN_X + 48.0, g - 110.0), Vector2(SIGN_X + 76.0, g - 88.0),
-		Vector2(SIGN_X + 48.0, g - 66.0), Vector2(SIGN_X - 62.0, g - 66.0),
-	]), Color(0.72, 0.55, 0.32))
-	draw_string(font, Vector2(SIGN_X - 56.0, g - 80.0), "GOBLINS", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, Color(0.25, 0.15, 0.08))
-
-
-func _draw_camp(cx: float, g: float) -> void:
-	draw_colored_polygon(PackedVector2Array([Vector2(cx - 60.0, g), Vector2(cx, g - 84.0), Vector2(cx + 60.0, g)]), Color(0.3, 0.4, 0.25))
-	draw_colored_polygon(PackedVector2Array([Vector2(cx - 16.0, g), Vector2(cx, g - 46.0), Vector2(cx + 16.0, g)]), Color(0.12, 0.16, 0.1))
-	draw_rect(Rect2(cx - 2.0, g - 122.0, 4.0, 40.0), Color(0.4, 0.26, 0.15))
-	draw_colored_polygon(PackedVector2Array([Vector2(cx + 2.0, g - 122.0), Vector2(cx + 34.0, g - 112.0), Vector2(cx + 2.0, g - 100.0)]), Color(0.75, 0.2, 0.2))
 
 
 func _draw_river(g: float) -> void:

@@ -37,6 +37,18 @@ SPIRIT = {
 }
 
 
+GOBLIN = {
+    "name": "goblin", "sheet": "goblin_a", "height": 76.0, "measure": ["leg_near", "head"],
+    "parts": [
+        ("body", 2, 1.0, (125, 262), None, None, 2),
+        ("leg_far", 4, 1.0, (66, 14), "body", (150, 250), 0),
+        ("leg_near", 3, 1.0, (66, 14), "body", (104, 252), 1),
+        ("arm", 1, 0.9, (22, 182), "body", (150, 100), 4),
+        ("head", 0, 0.8, (215, 240), "body", (112, 52), 3),
+    ],
+}
+
+
 def rot(v, deg):
     r = math.radians(deg)
     return (v[0] * math.cos(r) - v[1] * math.sin(r), v[0] * math.sin(r) + v[1] * math.cos(r))
@@ -127,7 +139,7 @@ def export(spec, parts_dir, out_dir):
 if __name__ == "__main__":
     parts_dir, out_root = sys.argv[1], sys.argv[2]
     preview = sys.argv[3] if len(sys.argv) > 3 else None
-    for spec in (ADELINE, SPIRIT):
+    for spec in (ADELINE, SPIRIT, GOBLIN):
         export(spec, parts_dir, os.path.join(out_root, spec["name"]))
     if preview:
         render(ADELINE, parts_dir, [
@@ -140,3 +152,10 @@ if __name__ == "__main__":
             {},
             {"leg_front_near": -32, "leg_front_far": 28, "leg_hind_near": 30, "leg_hind_far": -26, "tail": -18},
         ], os.path.join(preview, "spirit_poses.png"), px_per_world=2.6, cell=(640, 520))
+        render(GOBLIN, parts_dir, [
+            {},
+            {"leg_near": 28, "leg_far": -28},
+            {"arm": -70, "body": -8},
+            {"arm": 75, "body": 8},
+            {"body": 20, "head": 10},
+        ], os.path.join(preview, "goblin_poses.png"), px_per_world=5.0, cell=(420, 440))

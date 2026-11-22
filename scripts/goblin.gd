@@ -1,6 +1,8 @@
 extends CharacterBody2D
-## Placeholder goblin with two attacks. Every attack runs the same three steps
+## The goblin, built from cutout art, with two attacks. Every attack runs the same three steps
 ## every time: warning, attack, recovery. Direction locks when the warning ends.
+
+const RigScript := preload("res://scripts/rig.gd")
 
 enum State { APPROACH, SWING_WINDUP, SWING_ACTIVE, CHARGE_WINDUP, CHARGE_ACTIVE, RECOVERY, DEAD }
 
@@ -43,6 +45,7 @@ var hold_slot := 0  # where to wait when another goblin is attacking
 var attacks := "both"  # "swing", "charge" or "both", so each attack can be taught on its own
 var min_x := -INF
 var max_x := INF
+var rig = null
 
 
 func _ready() -> void:
@@ -54,6 +57,10 @@ func _ready() -> void:
 	col.shape = shape
 	col.position = Vector2(0.0, -HEIGHT / 2.0)
 	add_child(col)
+	rig = Node2D.new()
+	rig.set_script(RigScript)
+	add_child(rig)
+	rig.build("res://art/goblin")
 
 
 func body_rect() -> Rect2:
@@ -135,6 +142,7 @@ func _physics_process(delta: float) -> void:
 	velocity.x += knock
 	move_and_slide()
 	position.x = clampf(position.x, min_x, max_x)
+	_animate()
 	queue_redraw()
 
 
@@ -185,86 +193,98 @@ func take_damage(amount: int, from_dir: int) -> void:
 		game.on_goblin_defeated(self)
 
 
-func _draw() -> void:
-	var f := float(facing)
-	var body := Color(0.35, 0.65, 0.25)
-	var dark := Color(0.22, 0.45, 0.16)
-	var h := HEIGHT
-	var w := WIDTH
-	var lean := 0.0
-	var warn := Color(0, 0, 0, 0)
+func _animate() -> void:
+	var pose := {}
+	var squash := 1.0
+	var tint := Color.WHITE
 	var pulse := 0.5 + 0.5 * sin(anim_time * 22.0)
-
 	match state:
+		State.APPROACH:
+			if absf(velocity.x) > 10.0:
+				var step := sin(anim_time * 14.0)
+				pose["leg_near"] = step * 28.0
+				pose["leg_far"] = -step * 28.0
+				pose["arm"] = step * 5.0
 		State.SWING_WINDUP:
-			warn = Color(1.0, 0.25, 0.2)
-			body = body.lerp(Color(1.0, 0.85, 0.3), 0.35 + 0.35 * pulse)
+			# Club goes up and shakes: the warning for the swing.
+			var up := clampf(state_time / 0.25, 0.0, 1.0)
+			pose["arm"] = -75.0 * up + sin(anim_time * 40.0) * 3.0
+			pose["body"] = -8.0 * up
+			tint = Color(1.0 + 0.35 * pulse, 1.0 - 0.2 * pulse, 1.0 - 0.2 * pulse)
+		State.SWING_ACTIVE:
+			var k := clampf(state_time / SWING_ACTIVE, 0.0, 1.0)
+			pose["arm"] = lerpf(-75.0, 80.0, k)
+			pose["body"] = lerpf(-8.0, 10.0, k)
 		State.CHARGE_WINDUP:
-			h = HEIGHT * 0.68  # crouch
-			w = WIDTH * 1.2
-			warn = Color(1.0, 0.6, 0.1)
-			body = body.lerp(Color(1.0, 0.6, 0.2), 0.35 + 0.35 * pulse)
+			# Crouching low: the warning for the charge.
+			squash = 0.78
+			pose["body"] = 14.0
+			pose["head"] = -8.0
+			pose["arm"] = 20.0
+			pose["leg_near"] = sin(anim_time * 20.0) * 8.0
+			tint = Color(1.0 + 0.35 * pulse, 1.0, 1.0 - 0.3 * pulse)
 		State.CHARGE_ACTIVE:
-			lean = 0.35
+			var run := sin(anim_time * 30.0)
+			pose["body"] = 24.0
+			pose["head"] = -14.0
+			pose["arm"] = 40.0
+			pose["leg_near"] = run * 38.0
+			pose["leg_far"] = -run * 38.0
 		State.RECOVERY:
-			body = body.lerp(Color(0.6, 0.6, 0.6), 0.5)
+			pose["body"] = -6.0
+			pose["head"] = 14.0 + sin(anim_time * 5.0) * 6.0
+			pose["arm"] = 85.0
+			tint = Color(0.75, 0.75, 0.82)
+		State.DEAD:
+			pose["body"] = -85.0 * (1.0 - fade)
+	if state != State.DEAD:
+		# Keep the feet planted when the body leans.
+		var lean: float = pose.get("body", 0.0)
+		pose["leg_near"] = float(pose.get("leg_near", 0.0)) - lean
+		pose["leg_far"] = float(pose.get("leg_far", 0.0)) - lean
 	if flash > 0.0:
-		body = Color.WHITE
-	body.a = fade
-	dark.a = fade
+		tint = Color(2.4, 2.4, 2.4)
+	tint.a = fade
+	rig.modulate = tint
+	rig.scale = Vector2(facing, squash)
+	rig.pose = pose
+	rig.apply()
 
-	# Ground warnings: where the attack will land.
+
+func _draw() -> void:
+	# Warnings and markers only. The goblin himself is the rig.
+	var f := float(facing)
+	var pulse := 0.5 + 0.5 * sin(anim_time * 22.0)
+	var warn := Color(0, 0, 0, 0)
 	if state == State.SWING_WINDUP:
+		warn = Color(1.0, 0.25, 0.2)
 		var zone := Rect2(0.0 if f > 0.0 else -SWING_REACH, -6.0, SWING_REACH, 8.0)
 		draw_rect(zone, Color(1.0, 0.2, 0.2, 0.35 + 0.35 * pulse))
 	elif state == State.CHARGE_WINDUP:
+		warn = Color(1.0, 0.6, 0.1)
 		var tip_x := f * (70.0 + 90.0 * clampf(state_time / CHARGE_WINDUP, 0.0, 1.0))
-		draw_line(Vector2(f * 26.0, -4.0), Vector2(tip_x, -4.0), Color(1.0, 0.55, 0.1, 0.9), 8.0)
+		draw_line(Vector2(f * 30.0, -4.0), Vector2(tip_x, -4.0), Color(1.0, 0.55, 0.1, 0.9), 8.0)
 		draw_colored_polygon(PackedVector2Array([
 			Vector2(tip_x + f * 22.0, -4.0),
 			Vector2(tip_x, -18.0),
 			Vector2(tip_x, 10.0),
 		]), Color(1.0, 0.55, 0.1, 0.9))
-
-	draw_set_transform(Vector2.ZERO, lean * f, Vector2.ONE)
-	# Ears.
-	draw_colored_polygon(PackedVector2Array([Vector2(-w / 2.0, -h + 14.0), Vector2(-w / 2.0 - 16.0, -h + 2.0), Vector2(-w / 2.0, -h + 26.0)]), dark)
-	draw_colored_polygon(PackedVector2Array([Vector2(w / 2.0, -h + 14.0), Vector2(w / 2.0 + 16.0, -h + 2.0), Vector2(w / 2.0, -h + 26.0)]), dark)
-	# Body.
-	draw_rect(Rect2(-w / 2.0, -h, w, h), body)
-	# Eyes, looking where it faces.
-	var eye := Color(1.0, 0.95, 0.4, fade)
-	draw_circle(Vector2(f * 4.0, -h + 16.0), 4.0, eye)
-	draw_circle(Vector2(f * 14.0, -h + 16.0), 4.0, eye)
-
-	# Club.
-	var hand := Vector2(f * (w / 2.0), -h * 0.5)
-	var club_angle := -0.5
-	if state == State.SWING_WINDUP:
-		club_angle = -1.9 + sin(anim_time * 40.0) * 0.08  # raised and shaking
 	elif state == State.SWING_ACTIVE:
-		club_angle = lerpf(-1.9, 0.6, clampf(state_time / SWING_ACTIVE, 0.0, 1.0))
-	elif state == State.RECOVERY:
-		club_angle = 0.9
-	var club_tip := hand + Vector2(cos(club_angle) * f, sin(club_angle)) * 44.0
-	draw_line(hand, club_tip, Color(0.45, 0.3, 0.15, fade), 7.0)
-	draw_circle(club_tip, 9.0, Color(0.38, 0.25, 0.12, fade))
-	if state == State.SWING_ACTIVE:
-		draw_arc(hand, 56.0, -1.9 if f > 0.0 else PI - 0.6, 0.6 if f > 0.0 else PI + 1.9, 12, Color(1.0, 0.3, 0.2, 0.8), 9.0)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+		var hand := Vector2(f * 16.0, -34.0)
+		draw_arc(hand, 58.0, -1.9 if f > 0.0 else PI - 0.6, 0.6 if f > 0.0 else PI + 1.9, 12, Color(1.0, 0.3, 0.2, 0.8), 9.0)
 
 	# Warning mark above the head, readable with sound off.
 	if warn.a > 0.0:
-		var mark_y := -h - 46.0
+		var mark_y := -HEIGHT - 62.0
 		draw_rect(Rect2(-5.0, mark_y, 10.0, 24.0), warn)
 		draw_circle(Vector2(0.0, mark_y + 34.0), 6.0, warn)
 	# Dizzy stars while recovering: this is the moment to hit back.
 	if state == State.RECOVERY:
 		for i in 3:
 			var a := anim_time * 5.0 + i * TAU / 3.0
-			draw_circle(Vector2(cos(a) * 20.0, -h - 18.0 + sin(a) * 6.0), 4.0, Color(1.0, 0.95, 0.5))
+			draw_circle(Vector2(cos(a) * 22.0, -HEIGHT - 26.0 + sin(a) * 6.0), 4.0, Color(1.0, 0.95, 0.5))
 	# Health pips.
 	if state != State.DEAD:
 		for i in MAX_HEALTH:
 			var c := Color(0.9, 0.2, 0.25) if i < health else Color(0.0, 0.0, 0.0, 0.3)
-			draw_rect(Rect2(-MAX_HEALTH * 6.0 + i * 12.0, -HEIGHT - 76.0, 10.0, 6.0), c)
+			draw_rect(Rect2(-MAX_HEALTH * 6.0 + i * 12.0, -HEIGHT - 84.0, 10.0, 6.0), c)
