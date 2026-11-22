@@ -1,0 +1,105 @@
+name: Build APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  GODOT_VERSION: 4.4.1
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Cache Godot and Android templates
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-android-v1
+
+      - name: Download Godot and Android templates
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          set -e
+          mkdir -p ~/godot ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          cd "$RUNNER_TEMP"
+          base="https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable"
+          curl -fsSL -o godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q godot.zip
+          mv "Godot_v${GODOT_VERSION}-stable_linux.x86_64" ~/godot/godot
+          chmod +x ~/godot/godot
+          curl -fsSL -o templates.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q templates.tpz 'templates/android_*' 'templates/version.txt'
+          mv templates/* ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+          ls -la ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable/
+
+      - name: Point Godot at the Android SDK
+        run: |
+          mkdir -p ~/.config/godot
+          cat > ~/.config/godot/editor_settings-4.4.tres <<SETTINGS
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/debug_keystore = "$GITHUB_WORKSPACE/android/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          SETTINGS
+          cat ~/.config/godot/editor_settings-4.4.tres
+          ls "$ANDROID_HOME/build-tools" "$ANDROID_HOME/platform-tools" | head -30
+
+      - name: Stamp the build number
+        run: |
+          sed -i "s|^config/version=.*|config/version=\"0.1.${GITHUB_RUN_NUMBER}\"|" project.godot
+          sed -i "s|^version/code=.*|version/code=${GITHUB_RUN_NUMBER}|; s|^version/name=.*|version/name=\"0.1.${GITHUB_RUN_NUMBER}\"|" export_presets.cfg
+          grep -n "config/version" project.godot
+          grep -n "version/" export_presets.cfg
+
+      - name: Import project
+        run: timeout 300 ~/godot/godot --headless --path . --import || true
+
+      - name: Export APK
+        env:
+          GODOT_ANDROID_KEYSTORE_DEBUG_PATH: ${{ github.workspace }}/android/debug.keystore
+          GODOT_ANDROID_KEYSTORE_DEBUG_USER: androiddebugkey
+          GODOT_ANDROID_KEYSTORE_DEBUG_PASSWORD: android
+        run: |
+          mkdir -p build
+          ~/godot/godot --headless --path . --export-debug "Android" build/adeline.apk
+          ls -la build
+          test -s build/adeline.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: adeline-apk
+          path: build/adeline.apk
+
+      - name: Publish as the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete latest --yes --cleanup-tag || true
+          gh release create latest build/adeline.apk \
+            --target "$GITHUB_SHA" \
+            --title "Latest build (0.1.${GITHUB_RUN_NUMBER})" \
+            --notes "Newest playable build of Adeline. Download adeline.apk on the tablet and tap it to install."
