@@ -35,9 +35,11 @@ a purple hooded cloak and swirl-patterned boots. Spirit is her dark brown horse.
 
 Adeline and Spirit are real art now, built as paper-puppet rigs: each is a set of separate
 parts (head, arm, legs, cloak, tail and so on) that the game rotates at the joints.
-Merlin, the goblins and the buildings are still stand-in shapes.
+The farmhouse with Spirit's stable, Merlin's hut, the flying boat and Merlin himself are real art too,
+placed as single pictures. The goblins, the signpost, the goblin camps and the ground are still stand-in shapes.
 
 - `art/adeline` and `art/spirit` hold the game textures and a `rig.json` that lists the joints.
+- `art/props` holds the scenery and Merlin. `art_src/build_props.py` sets how tall each one is in the game.
 - `art_src` holds the original parts and `build_rig.py`, which turns them into the game files.
   Godot ignores this folder. Joint positions and part sizes are at the top of that script.
 - `scripts/rig.gd` assembles a rig. The poses live in `scripts/player.gd` and `scripts/horse.gd`.

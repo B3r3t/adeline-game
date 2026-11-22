@@ -16,16 +16,18 @@ const LEVEL_LEFT := 0.0
 const LEVEL_RIGHT := 5400.0
 const CAMERA_ZOOM := 1.4  # bigger characters are easier to read on an 8 inch screen
 
-const HOUSE_X := 150.0
-const STABLE_X := 485.0  # where Spirit waits
-const START_X := 700.0
-const MERLIN_X := 1280.0
-const SIGN_X := 1560.0
-const GATE_X := 1700.0  # Adeline cannot head east until she has the mission
+const HOUSE_X := 40.0  # left edge of the farmhouse
+const STABLE_X := 549.0  # where Spirit waits, inside the stable
+const START_X := 800.0
+const HUT_X := 1150.0  # middle of Merlin's hut
+const MERLIN_X := 1420.0
+const SIGN_X := 1640.0
+const GATE_X := 1760.0  # Adeline cannot head east until she has the mission
 const RIVER_X := 5080.0
 const TALK_RANGE := 120.0
 const RIDE_RANGE := 100.0
 const SAVE_PATH := "user://save.json"
+const ART_SCALE := 1.0 / 2.2  # scenery art is drawn at 2.2 pixels per world pixel
 
 # Five goblins in three camps. The first teaches the swing, the second the charge,
 # and the third mixes both with one goblin attacking at a time.
@@ -49,6 +51,8 @@ const ENCOUNTERS := [
 
 var player = null
 var horse = null
+var merlin: Sprite2D
+var boat: Sprite2D
 var goblins: Array = []
 var projectiles: Node2D
 var camera: Camera2D
@@ -78,6 +82,7 @@ func _ready() -> void:
 	_setup_input()
 	_build_backdrop()
 	_build_ground()
+	_build_scenery()
 
 	projectiles = Node2D.new()
 	add_child(projectiles)
@@ -168,6 +173,25 @@ func _build_ground() -> void:
 	_add_wall(Rect2(LEVEL_LEFT - 400.0, GROUND_Y, LEVEL_RIGHT - LEVEL_LEFT + 800.0, 400.0))
 	_add_wall(Rect2(LEVEL_LEFT - 200.0, GROUND_Y - 1200.0, 200.0, 1200.0))
 	_add_wall(Rect2(LEVEL_RIGHT, GROUND_Y - 1200.0, 200.0, 1200.0))
+
+
+## Scenery art sits behind the characters. Each piece stands on the ground line.
+func _build_scenery() -> void:
+	_add_scenery("house", HOUSE_X, false)
+	_add_scenery("hut", HUT_X, true)
+	merlin = _add_scenery("merlin", MERLIN_X, true)
+	boat = _add_scenery("boat", RIVER_X + 210.0, true)
+
+
+func _add_scenery(art: String, x: float, centred: bool) -> Sprite2D:
+	var sprite := Sprite2D.new()
+	sprite.texture = load("res://art/props/%s.png" % art)
+	sprite.centered = false
+	sprite.scale = Vector2(ART_SCALE, ART_SCALE)
+	var size := sprite.texture.get_size() * ART_SCALE
+	sprite.position = Vector2(x - (size.x / 2.0 if centred else 0.0), GROUND_Y + 4.0 - size.y)
+	add_child(sprite)
+	return sprite
 
 
 func _add_wall(rect: Rect2) -> void:
@@ -494,13 +518,13 @@ func _give_shield() -> void:
 
 func _begin_practice() -> void:
 	_dismount()
-	horse.retreat(1040.0)
+	horse.retreat(MERLIN_X - 260.0)
 	var n := int(data["practice_round"])
 	var specs := []
 	for i in n:
-		specs.append({ "x": 1960.0 + 130.0 * i, "attacks": "both" })
+		specs.append({ "x": MERLIN_X + 680.0 + 130.0 * i, "attacks": "both" })
 	_begin_encounter({
-		"left": 1130.0, "right": 2380.0, "goblins": specs,
+		"left": MERLIN_X - 150.0, "right": MERLIN_X + 1100.0, "goblins": specs,
 		"hint": "Practice: tap SHIELD just before an attack lands.",
 	}, "practice")
 
@@ -606,6 +630,10 @@ func _process(delta: float) -> void:
 	var cam_x := camera.get_screen_center_position().x
 	hills_far.position.x = cam_x * 0.85
 	hills_near.position.x = cam_x * 0.6
+	# Merlin turns to face Adeline, and the boat hovers over the river.
+	merlin.flip_h = player.position.x < MERLIN_X
+	var boat_h := boat.texture.get_size().y * ART_SCALE
+	boat.position.y = GROUND_Y + 34.0 - boat_h + sin(clock * 2.0) * 5.0
 	queue_redraw()
 
 
@@ -627,8 +655,7 @@ func _draw() -> void:
 		x += 200.0
 		i += 1
 
-	_draw_house(g)
-	_draw_hut_and_merlin(g)
+	_draw_merlin_mark(g)
 	_draw_sign(g)
 	for n in ENCOUNTERS.size():
 		if n >= cleared():
@@ -637,42 +664,12 @@ func _draw() -> void:
 	_draw_river(g)
 
 
-func _draw_house(g: float) -> void:
-	var hx := HOUSE_X
-	# Stable, attached to the right side of the house.
-	draw_rect(Rect2(hx + 220.0, g - 176.0, 230.0, 176.0), Color(0.55, 0.38, 0.22))
-	draw_rect(Rect2(hx + 236.0, g - 158.0, 198.0, 158.0), Color(0.25, 0.17, 0.1))
-	draw_rect(Rect2(hx + 212.0, g - 190.0, 246.0, 14.0), Color(0.4, 0.26, 0.15))
-	# House.
-	draw_rect(Rect2(hx, g - 170.0, 220.0, 170.0), Color(0.95, 0.9, 0.78))
-	draw_colored_polygon(PackedVector2Array([Vector2(hx - 20.0, g - 170.0), Vector2(hx + 110.0, g - 262.0), Vector2(hx + 240.0, g - 170.0)]), Color(0.75, 0.3, 0.25))
-	draw_rect(Rect2(hx + 84.0, g - 84.0, 52.0, 84.0), Color(0.5, 0.32, 0.18))
-	draw_rect(Rect2(hx + 156.0, g - 132.0, 44.0, 44.0), Color(0.7, 0.88, 0.98))
-	draw_rect(Rect2(hx + 22.0, g - 132.0, 44.0, 44.0), Color(0.7, 0.88, 0.98))
-
-
-func _draw_hut_and_merlin(g: float) -> void:
-	# Wooden hut.
-	draw_rect(Rect2(1000.0, g - 130.0, 180.0, 130.0), Color(0.58, 0.4, 0.24))
-	for k in 4:
-		draw_line(Vector2(1000.0, g - 26.0 - 30.0 * k), Vector2(1180.0, g - 26.0 - 30.0 * k), Color(0.45, 0.3, 0.17), 3.0)
-	draw_colored_polygon(PackedVector2Array([Vector2(980.0, g - 130.0), Vector2(1090.0, g - 250.0), Vector2(1200.0, g - 130.0)]), Color(0.4, 0.3, 0.55))
-	draw_rect(Rect2(1066.0, g - 80.0, 48.0, 80.0), Color(0.35, 0.22, 0.12))
-	draw_circle(Vector2(1146.0, g - 92.0), 16.0, Color(1.0, 0.9, 0.55))
-	# Merlin.
-	var mx := MERLIN_X
-	draw_line(Vector2(mx + 34.0, g), Vector2(mx + 34.0, g - 104.0), Color(0.45, 0.3, 0.17), 5.0)
-	draw_circle(Vector2(mx + 34.0, g - 110.0), 9.0, Color(0.5, 0.85, 1.0))
-	draw_colored_polygon(PackedVector2Array([Vector2(mx - 26.0, g), Vector2(mx + 26.0, g), Vector2(mx + 15.0, g - 72.0), Vector2(mx - 15.0, g - 72.0)]), Color(0.42, 0.28, 0.7))
-	draw_circle(Vector2(mx, g - 84.0), 13.0, Color(0.98, 0.84, 0.72))
-	draw_colored_polygon(PackedVector2Array([Vector2(mx - 12.0, g - 80.0), Vector2(mx + 12.0, g - 80.0), Vector2(mx, g - 44.0)]), Color(0.95, 0.95, 0.95))
-	draw_colored_polygon(PackedVector2Array([Vector2(mx - 20.0, g - 92.0), Vector2(mx + 20.0, g - 92.0), Vector2(mx + 4.0, g - 146.0)]), Color(0.22, 0.25, 0.6))
-	draw_circle(Vector2(mx + 2.0, g - 112.0), 4.0, Color(1.0, 0.9, 0.4))
-	# A bobbing mark when he has something new to say.
+func _draw_merlin_mark(g: float) -> void:
+	# A bobbing mark over Merlin when he has something new to say.
 	if mode == "play" and merlin_has_news():
 		var bob := sin(clock * 4.0) * 5.0
-		draw_rect(Rect2(mx - 5.0, g - 200.0 + bob, 10.0, 26.0), Color(1.0, 0.85, 0.2))
-		draw_circle(Vector2(mx, g - 162.0 + bob), 6.0, Color(1.0, 0.85, 0.2))
+		draw_rect(Rect2(MERLIN_X - 5.0, g - 226.0 + bob, 10.0, 26.0), Color(1.0, 0.85, 0.2))
+		draw_circle(Vector2(MERLIN_X, g - 188.0 + bob), 6.0, Color(1.0, 0.85, 0.2))
 
 
 func _draw_sign(g: float) -> void:
@@ -694,10 +691,3 @@ func _draw_camp(cx: float, g: float) -> void:
 func _draw_river(g: float) -> void:
 	draw_rect(Rect2(RIVER_X, g + 6.0, 800.0, 600.0), Color(0.25, 0.55, 0.85))
 	draw_rect(Rect2(RIVER_X, g + 6.0, 800.0, 10.0), Color(0.6, 0.82, 0.98))
-	# The magic boat, with small wings.
-	var bx := RIVER_X + 40.0
-	var bob := sin(clock * 2.0) * 3.0
-	draw_colored_polygon(PackedVector2Array([Vector2(bx, g - 22.0 + bob), Vector2(bx + 220.0, g - 22.0 + bob), Vector2(bx + 180.0, g + 24.0 + bob), Vector2(bx + 30.0, g + 24.0 + bob)]), Color(0.55, 0.36, 0.2))
-	draw_rect(Rect2(bx + 104.0, g - 130.0 + bob, 8.0, 108.0), Color(0.4, 0.26, 0.15))
-	draw_colored_polygon(PackedVector2Array([Vector2(bx + 112.0, g - 128.0 + bob), Vector2(bx + 190.0, g - 62.0 + bob), Vector2(bx + 112.0, g - 44.0 + bob)]), Color(0.95, 0.92, 0.8))
-	draw_colored_polygon(PackedVector2Array([Vector2(bx + 30.0, g - 10.0 + bob), Vector2(bx - 34.0, g - 46.0 + bob), Vector2(bx + 60.0, g - 22.0 + bob)]), Color(0.8, 0.9, 1.0))
