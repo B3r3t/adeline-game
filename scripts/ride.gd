@@ -69,6 +69,8 @@ var run_time := 0.0
 var stars := 0
 var last_x := 0.0
 var shadow: Sprite2D = null
+var flight := 0.0  # how long the current time in the air has lasted
+var streak := 0  # rings collected in a row
 
 
 func clear() -> void:
@@ -90,6 +92,8 @@ func start(number: int) -> void:
 	jumps_clean = 0
 	stumbles = 0
 	air_time = 0.0
+	flight = 0.0
+	streak = 0
 	finish_time = 0.0
 	run_time = 0.0
 	stars = 0
@@ -558,6 +562,13 @@ func _physics_process(delta: float) -> void:
 	_place_shadow()
 	if rider.impact > 0.0:
 		_dust(Vector2(rider.x, rider.y), clampf(rider.impact / 500.0, 0.4, 1.4))
+		game.sound.play("land", clampf(-14.0 + rider.impact / 60.0, -14.0, -2.0), 0.08)
+		flight = 0.0
+	if not rider.grounded and not finished:
+		# A long flight, off a ledge or a big jump, earns a whoop.
+		flight += delta
+		if flight > 0.75 and flight - delta <= 0.75:
+			game.sound.shout("adeline", "woohoo", 0.7)
 	if finished:
 		finish_time += delta
 		return
@@ -574,6 +585,8 @@ func _physics_process(delta: float) -> void:
 				item["done"] = true
 				if absf(rider.y - RIDER_HEIGHT - float(item["y"])) <= RING_OPENING:
 					_collect(item)
+				else:
+					streak = 0
 		elif px > ix + 130.0:
 			item["done"] = true
 			jumps_clean += 1
@@ -611,6 +624,9 @@ func _knock(body: RigidBody2D, hit: Vector2) -> void:
 	body.apply_impulse(shove * body.mass, Vector2(randf_range(-14.0, 14.0), randf_range(2.0, 10.0)))
 	if body.get_child(0).shape is CircleShape2D:
 		body.angular_velocity = hit.x / 27.0 * 0.7  # a bale starts off rolling
+		game.sound.play("thump", -3.0, 0.1)
+	else:
+		game.sound.play("clatter", -4.0, 0.12, 1.0, 0.12)
 	_dust(body.global_position, 0.8)
 
 
@@ -622,6 +638,8 @@ func _stumble() -> void:
 	var rig = game.horse.rig
 	rig.modulate = Color(1.7, 0.75, 0.75)
 	rig.create_tween().tween_property(rig, "modulate", Color.WHITE, 0.45)
+	game.sound.shout("adeline", "whoa", 1.0, true)
+	game.sound.play("snort", -3.0)
 
 
 func _place_shadow() -> void:
@@ -666,6 +684,9 @@ func _dust(at: Vector2, strength: float) -> void:
 
 func _collect(item: Dictionary) -> void:
 	rings_got += 1
+	# Each ring in a row rings a little higher.
+	game.sound.play("chime", -4.0, 0.0, 1.0 + 0.06 * minf(streak, 8.0), 0.0)
+	streak += 1
 	for half in item["nodes"]:
 		var tween: Tween = half.create_tween()
 		tween.set_parallel(true)

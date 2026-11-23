@@ -31,6 +31,7 @@ func say(who: String, what: Array, when_done: Callable = Callable()) -> void:
 	index = 0
 	done_callback = when_done
 	opened = 0.0
+	_speak()
 	queue_redraw()
 
 
@@ -44,7 +45,15 @@ func choose(title: String, options: Array, when_picked: Callable) -> void:
 	queue_redraw()
 
 
+## Says the line on screen out loud, if it has been recorded.
+func _speak() -> void:
+	if game != null and game.sound != null and index < lines.size():
+		game.sound.say(str(lines[index]))
+
+
 func close() -> void:
+	if game != null and game.sound != null:
+		game.sound.hush()
 	active = false
 	list_mode = false
 	queue_redraw()
@@ -102,6 +111,8 @@ func _next_line() -> void:
 		close()
 		if callback.is_valid():
 			callback.call()
+	else:
+		_speak()
 
 
 func _tap_list(has_pos: bool, pos: Vector2) -> void:

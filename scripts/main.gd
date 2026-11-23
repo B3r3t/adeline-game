@@ -10,6 +10,7 @@ const TouchScript := preload("res://scripts/touch_controls.gd")
 const DialogScript := preload("res://scripts/dialog.gd")
 const HorseScript := preload("res://scripts/horse.gd")
 const RideScript := preload("res://scripts/ride.gd")
+const SoundScript := preload("res://scripts/sound.gd")
 
 const GROUND_Y := 560.0
 const LEVEL_LEFT := 0.0
@@ -28,6 +29,7 @@ const RIVER_X := 5080.0
 const TALK_RANGE := 120.0
 const RIDE_RANGE := 100.0
 const SAVE_PATH := "user://save.json"
+const SETTINGS_PATH := "user://settings.json"
 # Where the game looks for newer content. The files are published by the build on GitHub.
 const UPDATE_URL := "https://github.com/B3r3t/adeline-game/releases/download/latest/"
 const ART_SCALE := 1.0 / 2.2  # scenery art is drawn at 2.2 pixels per world pixel
@@ -58,6 +60,8 @@ const ENCOUNTERS := [
 var player = null
 var horse = null
 var ride = null  # the riding course
+var sound = null  # voices, grunts and effects
+var sound_on := true
 var zoom := CAMERA_ZOOM
 var merlin: Sprite2D
 var boat: Sprite2D
@@ -108,6 +112,11 @@ func _ready() -> void:
 	ride.set_script(RideScript)
 	ride.game = self
 	add_child(ride)
+
+	sound = Node.new()
+	sound.set_script(SoundScript)
+	sound.game = self
+	add_child(sound)
 
 	projectiles = Node2D.new()
 	add_child(projectiles)
@@ -283,12 +292,25 @@ func _load() -> void:
 		for key in data:
 			if parsed.has(key):
 				data[key] = parsed[key]
+	# Whether sound is on is kept apart from the adventure, so a new adventure does not reset it.
+	if FileAccess.file_exists(SETTINGS_PATH):
+		var settings = JSON.parse_string(FileAccess.get_file_as_string(SETTINGS_PATH))
+		if settings is Dictionary:
+			sound_on = bool(settings.get("sound", true))
+	if sound != null:
+		sound.set_muted(not sound_on)
 
 
 func _save() -> void:
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify(data))
+
+
+func _save_settings() -> void:
+	var file := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
+	if file != null:
+		file.store_string(JSON.stringify({ "sound": sound_on }))
 
 
 func cleared() -> int:
@@ -423,6 +445,7 @@ func _begin_encounter(enc: Dictionary, kind: String) -> void:
 	encounter = enc
 	encounter_kind = kind
 	_spawn_goblins()
+	sound.shout("goblin", "goblin_taunt", 1.0, true)
 	_update_limits()
 
 
@@ -502,11 +525,14 @@ func _encounter_cleared() -> void:
 	player.health = player.MAX_HEALTH
 	_update_limits()
 	_save()
+	sound.play("fanfare", -5.0, 0.0)
+	sound.shout("adeline", "take_that", 1.0, true)
 
 
 func on_player_defeated() -> void:
 	defeated = true
 	defeat_time = 0.0
+	sound.shout("adeline", "defeat", 1.0, true)
 
 
 ## Back to the start of the unfinished fight with full health. Nothing earned is lost.
@@ -563,6 +589,8 @@ func _interact() -> void:
 		_dismount()
 	elif context_action == "call":
 		horse.come()
+		sound.shout("adeline", "call", 1.0, true)
+		get_tree().create_timer(0.7).timeout.connect(func(): sound.play("whinny", -5.0))
 	elif context_action == "talk":
 		_dismount()
 		_talk_to_merlin()
@@ -579,6 +607,8 @@ func _mount() -> void:
 	player.reset_physics_interpolation()
 	player.facing = horse.facing
 	horse.set_mounted(true)
+	sound.shout("adeline", "lets_go", 1.0, true)
+	sound.play("snort", -6.0)
 
 
 func _dismount() -> void:
@@ -644,6 +674,7 @@ func _give_shield() -> void:
 	data["shield"] = true
 	_save()
 	toast("New spell: Magic Shield!")
+	sound.play("fanfare", -5.0, 0.0)
 
 
 func _begin_practice() -> void:
@@ -714,6 +745,11 @@ func new_game_rect() -> Rect2:
 	return Rect2(s.x / 2.0 - 400.0, s.y * 0.56 + 124.0, 380.0, 54.0)
 
 
+func sound_rect() -> Rect2:
+	var s := get_viewport_rect().size
+	return Rect2(40.0, s.y - 96.0, 190.0, 56.0)
+
+
 func menu_rect() -> Rect2:
 	var s := get_viewport_rect().size
 	return Rect2(s.x - 160.0, 52.0, 120.0, 48.0)
@@ -747,6 +783,8 @@ func start_ride(number: int) -> void:
 	horse.set_mounted(true)
 	ride.start(number)
 	_update_camera(0.0, true)
+	sound.shout("adeline", "lets_ride", 1.0, true)
+	sound.play("whinny", -6.0)
 
 
 func on_ride_finished(number: int, stars: int) -> void:
@@ -755,12 +793,15 @@ func on_ride_finished(number: int, stars: int) -> void:
 	if stars > int(best.get(key, 0)):
 		best[key] = stars
 	_save()
+	sound.play("fanfare", -5.0, 0.0)
+	sound.shout("adeline", "we_did_it", 1.0, true)
 
 
 func go_title() -> void:
 	if not dialog.active:
 		mode = "title"
 		_place_player()
+		sound.hush()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -778,7 +819,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if mode == "title":
 		if clock < 0.5:
 			return
-		if has_pos and ride_rect().has_point(pos):
+		if has_pos and sound_rect().has_point(pos):
+			sound_on = not sound_on
+			sound.set_muted(not sound_on)
+			_save_settings()
+			sound.play("chime", -4.0)
+		elif has_pos and ride_rect().has_point(pos):
 			start_ride(int(data["ride_course"]))
 		elif has_save() and has_pos and new_game_rect().has_point(pos):
 			if new_game_armed:

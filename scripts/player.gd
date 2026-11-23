@@ -190,6 +190,7 @@ func _ride(delta: float) -> void:
 			jump_buffer = maxf(jump_buffer - delta, 0.0)
 		if jump_buffer > 0.0 and (s.grounded or coyote > 0.0):
 			r.jump(s)
+			game.sound.shout("adeline", "ride_jump", 0.4)
 			jump_buffer = 0.0
 			coyote = 0.0
 		if Input.is_action_just_released("jump") and s.vy < -260.0:
@@ -227,6 +228,7 @@ func _read_actions(delta: float) -> void:
 		jump_buffer = maxf(jump_buffer - delta, 0.0)
 	if jump_buffer > 0.0 and coyote > 0.0:
 		velocity.y = RIDE_JUMP if mounted else JUMP_VELOCITY
+		game.sound.shout("adeline", "hup", 0.45)
 		jump_buffer = 0.0
 		coyote = 0.0
 	if Input.is_action_just_released("jump") and velocity.y < -260.0:
@@ -239,6 +241,8 @@ func _read_actions(delta: float) -> void:
 	if Input.is_action_just_pressed("strike") and not is_striking():
 		strike_time = 0.0
 		strike_hits.clear()
+		game.sound.play("swish", -7.0, 0.1)
+		game.sound.shout("adeline", "strike", 0.75)
 	if Input.is_action_just_pressed("shield") and game.has_shield() and shield_cd <= 0.0:
 		shield_time = SHIELD_TIME
 		shield_cd = SHIELD_COOLDOWN
@@ -266,6 +270,8 @@ func strike_rect() -> Rect2:
 func _cast_fireball() -> void:
 	fireball_cd = FIREBALL_COOLDOWN
 	cast_time = 0.0
+	game.sound.play("whoosh", -3.0, 0.08)
+	game.sound.shout("adeline", "fireball", 0.3)
 	var fb = Node2D.new()
 	fb.set_script(FireballScript)
 	fb.game = game
@@ -281,11 +287,14 @@ func take_hit(from_x: float) -> int:
 		return MISSED
 	if is_shielding():
 		block_flash = 0.35
+		game.sound.play("shield", -2.0)
 		return BLOCKED
 	if invuln > 0.0:
 		return MISSED
 	health -= 1
 	invuln = HURT_INVULN
+	game.sound.play("hit", -4.0, 0.1)
+	game.sound.shout("adeline", "hurt", 1.0, true)
 	knock = 420.0 if position.x >= from_x else -420.0
 	velocity.y = -320.0
 	strike_time = -1.0

@@ -1,0 +1,117 @@
+{
+ "sounds": {
+  "strike": [
+   "a_hah.ogg",
+   "a_hyah.ogg",
+   "a_yah.ogg"
+  ],
+  "hurt": [
+   "a_ow.ogg",
+   "a_oof.ogg"
+  ],
+  "hup": [
+   "a_hup.ogg"
+  ],
+  "ride_jump": [
+   "a_hup.ogg",
+   "a_up_we_go.ogg"
+  ],
+  "call": [
+   "a_call.ogg"
+  ],
+  "lets_go": [
+   "a_lets_go.ogg"
+  ],
+  "lets_ride": [
+   "a_lets_ride.ogg"
+  ],
+  "whoa": [
+   "a_whoa.ogg"
+  ],
+  "we_did_it": [
+   "a_we_did_it.ogg"
+  ],
+  "take_that": [
+   "a_take_that.ogg"
+  ],
+  "defeat": [
+   "a_defeat.ogg"
+  ],
+  "fireball": [
+   "a_fireball.ogg"
+  ],
+  "woohoo": [
+   "a_woohoo.ogg"
+  ],
+  "goblin_taunt": [
+   "g_taunt.ogg",
+   "g_nyeh.ogg"
+  ],
+  "goblin_attack": [
+   "g_graah.ogg",
+   "g_rargh.ogg"
+  ],
+  "goblin_hurt": [
+   "g_ow.ogg",
+   "g_eek.ogg"
+  ],
+  "goblin_down": [
+   "g_waah.ogg"
+  ],
+  "whinny": [
+   "whinny_a.ogg",
+   "whinny_b.ogg"
+  ],
+  "chime": [
+   "chime.ogg"
+  ],
+  "shield": [
+   "shield.ogg"
+  ],
+  "swish": [
+   "swish.ogg"
+  ],
+  "whoosh": [
+   "whoosh.ogg"
+  ],
+  "burst": [
+   "burst.ogg"
+  ],
+  "hit": [
+   "hit.ogg"
+  ],
+  "clop": [
+   "clop_0.ogg",
+   "clop_1.ogg",
+   "clop_2.ogg"
+  ],
+  "land": [
+   "land.ogg"
+  ],
+  "clatter": [
+   "clatter_0.ogg",
+   "clatter_1.ogg"
+  ],
+  "thump": [
+   "thump.ogg"
+  ],
+  "snort": [
+   "snort.ogg"
+  ],
+  "fanfare": [
+   "fanfare.ogg"
+  ]
+ },
+ "lines": {
+  "Adeline! Thank goodness you're here.": "merlin_0.ogg",
+  "Goblins are causing trouble all over our island. They work for the ogre across the water.": "merlin_1.ogg",
+  "Pick a mission and I'll tell you what to do.": "merlin_2.ogg",
+  "The goblins are east of here, past the signpost.": "merlin_3.ogg",
+  "Watch what a goblin does before it attacks. It always gives itself away.": "merlin_4.ogg",
+  "You did it! The island is safe again.": "merlin_5.ogg",
+  "Here is your reward: the Magic Shield.": "merlin_6.ogg",
+  "Tap SHIELD just before an attack lands and it will bounce right off.": "merlin_7.ogg",
+  "Head east past the signpost and send those goblins packing.": "merlin_8.ogg",
+  "Your wand strikes fast up close. Your fireball hits three times as hard, but it needs a moment between casts.": "merlin_9.ogg"
+ }
+}

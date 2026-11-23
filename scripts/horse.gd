@@ -92,9 +92,24 @@ func carry(delta: float) -> void:
 	position = p.position
 	facing = p.facing
 	speed = p.velocity.length()
+	_hoofbeats(speed * delta * 0.035, not p.air)
+	if state != "idle" and absf(position.x - p.position.x) < 800.0:
+		_hoofbeats(speed * delta * 0.035, true)
 	stride += speed * delta * 0.035
 	_animate()
 	queue_redraw()
+
+
+## A gallop is three quick beats and a moment in the air. The beats follow Spirit's
+## stride, so they speed up and slow down with her.
+func _hoofbeats(advance: float, on_ground: bool) -> void:
+	if not on_ground or speed < 80.0:
+		return
+	var before := fmod(stride, TAU) / TAU
+	var after := before + advance / TAU
+	for beat in [0.08, 0.26, 0.44]:
+		if (before < beat and after >= beat) or (after >= 1.0 + beat):
+			game.sound.play("clop", -9.0 + 3.0 * clampf(speed / 600.0, 0.0, 1.0), 0.14, 1.0, 0.0)
 
 
 func _move_to(x: float, pace: float, delta: float) -> bool:

@@ -118,5 +118,6 @@ func _draw_title(s: Vector2) -> void:
 	if saved:
 		var armed: bool = game.new_game_armed
 		_button(game.new_game_rect(), "Tap again to erase progress" if armed else "New adventure", 22, Color(0.6, 0.2, 0.2, 0.85) if armed else Color(1.0, 1.0, 1.0, 0.16))
+	_button(game.sound_rect(), "Sound: on" if game.sound_on else "Sound: off", 22, Color(1.0, 1.0, 1.0, 0.16))
 	if game.update_note != "":
 		_text(Vector2(0.0, s.y * 0.56 + 230.0), game.update_note, 22, Color(1.0, 0.92, 0.5), HORIZONTAL_ALIGNMENT_CENTER, s.x)

@@ -78,6 +78,8 @@ func is_attacking() -> bool:
 func _set_state(new_state: int) -> void:
 	state = new_state
 	state_time = 0.0
+	if new_state == State.SWING_WINDUP or new_state == State.CHARGE_WINDUP:
+		game.sound.shout("goblin", "goblin_attack", 1.0, true, -2.0)
 
 
 func _physics_process(delta: float) -> void:
@@ -184,11 +186,15 @@ func take_damage(amount: int, from_dir: int) -> void:
 		return
 	health -= amount
 	flash = 0.15
+	game.sound.play("hit", -6.0, 0.12)
+	if health > 0:
+		game.sound.shout("goblin", "goblin_hurt", 0.6)
 	if state == State.APPROACH or state == State.RECOVERY:
 		knock = from_dir * 180.0
 	if health <= 0:
 		health = 0
 		_set_state(State.DEAD)
+		game.sound.shout("goblin", "goblin_down", 1.0, true)
 		game.release_attack(self)
 		game.on_goblin_defeated(self)
 

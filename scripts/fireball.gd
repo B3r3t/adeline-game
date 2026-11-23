@@ -95,6 +95,7 @@ func _flash(at: Vector2, size: float) -> void:
 
 func _burst(sparks: int, power: float) -> void:
 	_flash(position, 2.2 * power + 0.8)
+	game.sound.play("burst", -4.0 + 3.0 * (power - 1.0), 0.1)
 	var boom := CPUParticles2D.new()
 	boom.texture = game.spark
 	boom.material = game.additive
