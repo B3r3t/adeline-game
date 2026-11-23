@@ -29,7 +29,9 @@ const KNOCK_KEEPS := 0.6  # the share of her speed she keeps after clipping some
 const TICK := 1.0 / 60.0  # the step used when working out a jump in advance
 
 const RIDER_HEIGHT := 112.0  # how far above Spirit's hooves the middle of Adeline is
-const RING_OPENING := 58.0  # how far off-centre she can be and still pass through a ring
+const RING_OPENING := 112.0  # how far above or below a ring's middle she can be and still get it
+const RING_REACH := 72.0  # Spirit is long: the ring counts from her nose reaching it to her tail leaving it
+const RING_AIM := 29.0  # how closely a worked-out jump must thread a ring when the course is built
 const PIECES := 4  # the collision layer for things that can be knocked over
 
 # The jump is one picture, cut into the parts that stand still and the three rails.
@@ -446,7 +448,7 @@ func _add_jump_ring(x: float, height: float) -> void:
 		var y := ground_y(x) - RIDER_HEIGHT - h
 		for d in range(60, 460, 20):
 			var path := trace(x - d, nominal_speed(x - d), true, pace(0.0))
-			if absf(path_y_at(path, x) - RIDER_HEIGHT - y) <= RING_OPENING * 0.5:
+			if absf(path_y_at(path, x) - RIDER_HEIGHT - y) <= RING_AIM:
 				_add_ring(x, y)
 				return
 		h -= 15.0
@@ -581,11 +583,15 @@ func _physics_process(delta: float) -> void:
 			continue
 		var ix: float = item["x"]
 		if item["kind"] == "ring":
-			if last_x < ix and px >= ix:
-				item["done"] = true
+			# If any part of Spirit and Adeline goes through the ring, it counts. So the ring is
+			# checked the whole time she is passing it, not at one instant, and it is given the
+			# moment she lines up with it.
+			if px >= ix - RING_REACH:
 				if absf(rider.y - RIDER_HEIGHT - float(item["y"])) <= RING_OPENING:
+					item["done"] = true
 					_collect(item)
-				else:
+				elif px > ix + RING_REACH:
+					item["done"] = true
 					streak = 0
 		elif px > ix + 130.0:
 			item["done"] = true
