@@ -65,13 +65,22 @@ Spirit's stable" button.
 - **The living room.** Twelve things to put in it: sofa, armchair, rug, table, bookshelf,
   lamp, plant, painting, clock, flowers, rocking horse and cushion. Tap one in the strip at
   the bottom to add it, drag it anywhere, and tap it to choose one of eight colours, flip
-  it, change its size or remove it. Up to 30 things. Adeline walks over to look at whatever
-  was just moved. The room is saved as it was left, and a new adventure does not clear it.
-- **The stable.** Drag an apple, carrot, hay or oats to Spirit's mouth to feed her, drag the
-  brush over her coat to clean off the dust, and stroke her with the heart to pet her.
+  it, change its size or remove it. Up to 30 things. The room is saved as it was left, and
+  a new adventure does not clear it.
+- The room behaves like a real space. The floor has depth: things further back look smaller
+  and sit behind things nearer the front. A thing let go in the air falls and lands with a
+  bump. Furniture stands on the floor, pictures and the clock stay on the wall, and the rug
+  lies under everything. The plant, flowers and cushion can sit on the table, the bookshelf,
+  the sofa or the armchair, ride along when it is moved, and drop to the floor if it is taken
+  away. A touch picks the thing actually touched, not the empty corner of a bigger one.
+  Tap the bare floor and Adeline walks there; she also comes over to look at whatever was
+  just put down.
+- **The stable.** Hold an apple, carrot, hay or oats up to Spirit's mouth to feed her; she
+  reaches for it. Her coat has dusty patches, and each one is brushed off where it is.
+  Stroke her with the heart to pet her; her neck and face are her favourite places. Anything
+  let go of falls into the straw. Adeline walks to Spirit's side or head to do the caring.
   Three bars (Food, Shine, Love) fill up; when all three are full Spirit whinnies and hops.
-  The bars run down slowly while away (about twenty minutes from full to empty), so there
-  is always something to do on the next visit.
+  The bars run down slowly while away (about twenty minutes from full to empty).
 - `scripts/indoors.gd` holds both rooms. Colours are made by turning each picture round the
   colour wheel with a small shader, so one drawing gives every colour.
 
@@ -83,7 +92,7 @@ Spirit's stable" button.
   down with her.
 - Effects for the wand, fireball, shield, rings, knocked rails, rolling bales and landings.
 - "Sound: on / off" sits in the bottom-left corner of the title screen and is remembered.
-- The voices were recorded with a text-to-speech service (Adeline uses the "Ainsley" voice, picked by ear). The effects are made from scratch
+- The voices were recorded with a text-to-speech service (Adeline uses the "Ainsley" voice and Merlin the "Landon" voice, both picked by ear). The effects are made from scratch
   by `art_src/build_audio.py`, which also trims and levels the recordings and writes
   `audio/manifest.json`. `scripts/sound.gd` plays everything; a sound missing from the list is
   simply silent. A new spoken line needs a recording added to that script's `MERLIN` list.
