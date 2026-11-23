@@ -1,4 +1,4 @@
-"""Cuts the indoor art into game files: two backgrounds, the furniture and the horse-care items.
+"""Cuts the indoor art into game files: three backgrounds, the furniture and the horse-care items.
 Run: python3 build_room.py room ../art/room"""
 import os, sys
 import numpy as np
@@ -9,10 +9,12 @@ SHEETS = {
     "furn_a": ["sofa", "armchair", "rug", "bookshelf", "lamp", "table"],
     "furn_b": ["plant", "painting", "clock", "flowers", "rocking_horse", "cushion"],
     "care": ["apple", "carrot", "brush", "hay", "heart", "oats"],
+    "bed_a": ["bed", "wardrobe", "nightstand", "mirror", "desk", "chest"],
+    "bed_b": ["heart_rug", "bedside_lamp", "teddy", "toy_horse", "poster", "bunting"],
 }
 src, out = sys.argv[1], sys.argv[2]
 os.makedirs(out, exist_ok=True)
-for name in ["room", "stable"]:
+for name in ["room", "stable", "bedroom"]:
     Image.open(os.path.join(src, name + "_src.png")).convert("RGB").save(os.path.join(out, name + ".jpg"), quality=90)
 for sheet, names in SHEETS.items():
     im = Image.open(os.path.join(src, sheet + ".png")).convert("RGBA")

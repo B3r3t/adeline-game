@@ -38,6 +38,12 @@ const FURNITURE := [
 	["plant", 0.7, "floor", 0.0, true], ["painting", 0.6, "wall", 0.0, false], ["clock", 0.45, "wall", 0.0, false],
 	["flowers", 0.5, "floor", 0.0, true], ["rocking_horse", 0.7, "floor", 0.0, false], ["cushion", 0.55, "floor", 0.0, true],
 ]
+const BEDROOM := [
+	["bed", 1.15, "floor", 0.5, false], ["wardrobe", 1.1, "floor", 0.03, false], ["nightstand", 0.6, "floor", 0.06, false],
+	["desk", 0.9, "floor", 0.06, false], ["chest", 0.7, "floor", 0.12, false], ["mirror", 0.9, "floor", 0.0, false],
+	["heart_rug", 1.1, "rug", 0.0, false], ["bedside_lamp", 0.4, "floor", 0.0, true], ["teddy", 0.4, "floor", 0.0, true],
+	["toy_horse", 0.45, "floor", 0.0, true], ["poster", 0.6, "wall", 0.0, false], ["bunting", 1.0, "wall", 0.0, false],
+]
 # name and what it is for
 const CARE := [["apple", "food"], ["carrot", "food"], ["hay", "food"], ["oats", "food"], ["brush", "brush"], ["heart", "pet"]]
 
@@ -68,7 +74,7 @@ var overlay: Control = null
 var shader: Shader = null
 var textures := {}
 var images := {}
-var home := { "room": [], "care": { "food": 0.0, "shine": 0.0, "love": 0.0, "time": 0.0 } }
+var home := { "room": [], "bedroom": [], "care": { "food": 0.0, "shine": 0.0, "love": 0.0, "time": 0.0 } }
 var clock := 0.0
 var finger := -1
 var note := ""
@@ -81,7 +87,9 @@ var goal := Vector2.ZERO
 var facing := 1
 var walk := 0.0
 
-# The living room.
+# The house: the living room and the bedroom.
+var room := "living"
+var backdrop: Sprite2D = null
 var things: Array = []  # each: { "data": what is saved, "node": its picture, and how it is falling }
 var selected := -1
 var dragging := false
@@ -113,8 +121,9 @@ func _ready() -> void:
 	if FileAccess.file_exists(SAVE_PATH):
 		var saved = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 		if saved is Dictionary:
-			if saved.get("room") is Array:
-				home["room"] = saved["room"]
+			for key in ["room", "bedroom"]:
+				if saved.get(key) is Array:
+					home[key] = saved[key]
 			if saved.get("care") is Dictionary:
 				for key in home["care"]:
 					home["care"][key] = float(saved["care"].get(key, 0.0))
@@ -122,10 +131,10 @@ func _ready() -> void:
 
 func _save() -> void:
 	if place == "house":
-		var room: Array = []
+		var list: Array = []
 		for thing in things:
-			room.append(thing["data"])
-		home["room"] = room
+			list.append(thing["data"])
+		home["room" if room == "living" else "bedroom"] = list
 	home["care"]["time"] = Time.get_unix_time_from_system()
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file != null:
@@ -134,7 +143,7 @@ func _save() -> void:
 
 func _tex(name: String) -> Texture2D:
 	if not textures.has(name):
-		var ext := "jpg" if name == "room" or name == "stable" else "png"
+		var ext := "jpg" if name == "room" or name == "stable" or name == "bedroom" else "png"
 		textures[name] = load("res://art/room/%s.%s" % [name, ext])
 	return textures[name]
 
@@ -167,7 +176,7 @@ func open(which: String) -> void:
 	note = ""
 	stage = Node2D.new()
 	add_child(stage)
-	var backdrop := Sprite2D.new()
+	backdrop = Sprite2D.new()
 	backdrop.texture = _tex("room" if which == "house" else "stable")
 	backdrop.centered = false
 	backdrop.z_index = -4000
@@ -243,16 +252,33 @@ func _say(text: String) -> void:
 # --- The living room ---------------------------------------------------------
 
 func _open_house() -> void:
-	at = Vector2(1120.0, _front() - 14.0)
+	room = ""
+	_enter_room("living")
+
+
+## Walks through the door into the other room. Each room keeps its own things.
+func _enter_room(which: String) -> void:
+	if room != "":
+		_save()
+	for thing in things:
+		thing["node"].queue_free()
+	things.clear()
+	selected = -1
+	dragging = false
+	room = which
+	backdrop.texture = _tex("room" if which == "living" else "bedroom")
+	# She comes in by the door: on the right of the living room, on the left of the bedroom.
+	at = Vector2(_seen().end.x - 190.0 if which == "living" else _seen().position.x + 190.0, _front() - 14.0)
 	goal = at
-	facing = -1
+	facing = -1 if which == "living" else 1
+	clock = 0.0
 	next_id = 1
-	for data in home["room"]:
-		if not (data is Dictionary) or _kind(str(data.get("t", ""))) < 0:
+	for data in home["room" if which == "living" else "bedroom"]:
+		if not (data is Dictionary) or _named(str(data.get("t", ""))).is_empty():
 			continue
 		if int(data.get("v", 1)) < 2:
 			# Rooms saved by the first version kept the middle of each thing, not its foot.
-			var spec: Array = FURNITURE[_kind(str(data["t"]))]
+			var spec: Array = _named(str(data["t"]))
 			data["y"] = float(data["y"]) + _tex(str(data["t"])).get_height() * float(spec[1]) * float(SIZES[clampi(int(data.get("s", 1)), 0, 2)]) / 2.0
 			data["on"] = -1
 			data["v"] = 2
@@ -263,15 +289,21 @@ func _open_house() -> void:
 		_refresh(i)
 
 
-func _kind(name: String) -> int:
-	for i in FURNITURE.size():
-		if FURNITURE[i][0] == name:
-			return i
-	return -1
+## The things that can be put in the room she is in.
+func _list() -> Array:
+	return FURNITURE if room == "living" else BEDROOM
+
+
+## What is known about a kind of furniture, from either room's list.
+func _named(name: String) -> Array:
+	for entry in FURNITURE + BEDROOM:
+		if entry[0] == name:
+			return entry
+	return []
 
 
 func _spec(index: int) -> Array:
-	return FURNITURE[_kind(str(things[index]["data"]["t"]))]
+	return _named(str(things[index]["data"]["t"]))
 
 
 ## The nearest the floor comes to the player before the tray hides it.
@@ -378,7 +410,7 @@ func _add(kind: int) -> void:
 	if things.size() >= MAX_THINGS:
 		_say("The room is full! Take something out first.")
 		return
-	var spec: Array = FURNITURE[kind]
+	var spec: Array = _list()[kind]
 	var x := clampf(ROOM.x * 0.5 + randf_range(-220.0, 220.0), _seen().position.x + 80.0, _seen().end.x - 80.0)
 	var data := { "id": next_id, "t": spec[0], "x": x, "y": 250.0, "h": 0, "f": false, "s": 1, "on": -1, "v": 2 }
 	next_id += 1
@@ -829,7 +861,10 @@ func _press(pos: Vector2) -> bool:
 			cell = i
 	var spot := _to_room(pos)
 	if place == "house":
-		if cell >= 0:
+		if _room_rect().has_point(pos):
+			_enter_room("bedroom" if room == "living" else "living")
+			game.sound.play("thump", -8.0)
+		elif cell >= 0:
 			_add(cell)
 		elif selected >= 0 and _bar_press(pos):
 			pass  # a colour or a button was tapped
@@ -910,7 +945,7 @@ func _bar_press(pos: Vector2) -> bool:
 # --- What is on screen besides the room ---------------------------------------
 
 func _tray_count() -> int:
-	return FURNITURE.size() if place == "house" else CARE.size()
+	return _list().size() if place == "house" else CARE.size()
 
 
 func _cell_rect(i: int) -> Rect2:
@@ -918,6 +953,12 @@ func _cell_rect(i: int) -> Rect2:
 	var n := _tray_count()
 	var w := minf(118.0, (s.x - 32.0) / n)
 	return Rect2((s.x - n * w) / 2.0 + i * w + 4.0, s.y - TRAY + 8.0, w - 8.0, TRAY - 16.0)
+
+
+## The button by the door that leads to the other room.
+func _room_rect() -> Rect2:
+	var s := get_viewport_rect().size
+	return Rect2(s.x - 236.0 if room == "living" else 24.0, 124.0, 212.0, 52.0)
 
 
 func _back_rect() -> Rect2:
@@ -957,7 +998,7 @@ func _draw_ui() -> void:
 	overlay.draw_rect(Rect2(0.0, s.y - TRAY, s.x, TRAY), Color(0.12, 0.08, 0.06, 0.86))
 	for i in _tray_count():
 		var r := _cell_rect(i)
-		var name: String = FURNITURE[i][0] if place == "house" else CARE[i][0]
+		var name: String = _list()[i][0] if place == "house" else CARE[i][0]
 		overlay.draw_rect(r, Color(1.0, 0.95, 0.85, 0.3 if name == tool else 0.13))
 		_fit(_tex(name), r)
 	_button(_back_rect(), "Back outside", 22, Color(0.08, 0.1, 0.2, 0.6))
@@ -970,10 +1011,11 @@ func _draw_ui() -> void:
 
 
 func _draw_house(s: Vector2) -> void:
+	_button(_room_rect(), "To the bedroom" if room == "living" else "To the living room", 20, Color(0.3, 0.6, 0.35, 0.9))
 	if things.is_empty():
-		_text(Vector2(0.0, 160.0), "Tap something below to put it in the room.", 26, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
+		_text(Vector2(0.0, 216.0), "Tap something below to put it in the room.", 26, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
 	elif selected < 0 and clock < 7.0:
-		_text(Vector2(0.0, 160.0), "Drag things to move them. Small things can sit on the table. Tap the floor and Adeline walks there.", 21, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
+		_text(Vector2(0.0, 216.0), "Drag things to move them. Small things can sit on the furniture. Tap the floor and Adeline walks there.", 21, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
 	if selected < 0 or selected >= things.size():
 		return
 	var node: Sprite2D = things[selected]["node"]

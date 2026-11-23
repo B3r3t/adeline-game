@@ -15,6 +15,7 @@ Step 3: all of Mission 1, "Goblin Trouble", in real art.
 - Five goblins in three camps. The first only swings, the second only charges, the third camp mixes both with one goblin attacking at a time.
 - Losing a fight restarts only that fight, with full health.
 - Returning to Merlin awards the Magic Shield, then opens practice fights of one to three goblins.
+- When Adeline rides she is drawn in front of the saddle, sitting on it with her near leg over the flap; her far leg is out of sight behind Spirit.
 - Spirit wears a leather saddle on a purple blanket, and reins that run from her bit to Adeline's hands while she rides and loop back to the saddle when she does not.
 - Spirit, Adeline's horse (dark brown, black mane and tail), waits in the stable. Tap Call and Spirit comes to her, tap Ride to gallop across the island, and Spirit stays back from goblin fights.
 
@@ -62,6 +63,10 @@ The course runs on real physics:
 Near the front door a "Go into the house" button appears, and near the stable a "Visit
 Spirit's stable" button.
 
+- **Two rooms to decorate**, joined by a door: the living room and Adeline's bedroom. Each
+  keeps its own things. The bedroom has a bed, wardrobe, bedside table, desk, toy chest,
+  mirror, heart rug, bedside lamp, teddy, toy horse, horse poster and bunting. The teddy,
+  toy horse and lamp can sit on the bed, the bedside table, the desk or the chest.
 - **The living room.** Twelve things to put in it: sofa, armchair, rug, table, bookshelf,
   lamp, plant, painting, clock, flowers, rocking horse and cushion. Tap one in the strip at
   the bottom to add it, drag it anywhere, and tap it to choose one of eight colours, flip

@@ -6,7 +6,7 @@ extends Node2D
 const RigScript := preload("res://scripts/rig.gd")
 
 const GALLOP := 620.0
-const SEAT := Vector2(-32.0, -27.0)  # the dip of Spirit's back, measured from the body joint
+const SEAT := Vector2(-31.0, -32.0)  # the dip of Spirit's back, measured from the body joint
 const NAME := "Spirit"
 
 var game = null
@@ -86,7 +86,9 @@ func retreat(x: float) -> void:
 
 func set_mounted(on: bool) -> void:
 	state = "mounted" if on else "idle"
-	z_index = 1 if on else 0  # in front of Adeline while she rides
+	# Adeline is drawn in front of Spirit, sitting on the saddle. Her far leg, which would
+	# be behind Spirit, is hidden while she rides.
+	z_index = 0
 
 
 func _physics_process(delta: float) -> void:
@@ -179,8 +181,8 @@ func _animate() -> void:
 	rig.root_angle = tilt
 	rig.root_offset = Vector2(0.0, bounce) + joint.rotated(tilt) - joint
 	rig.apply()
-	# Adeline's near leg, drawn over Spirit's side while she rides.
-	rider.visible = state == "mounted"
+	# Adeline draws her own near leg now that she sits in front of Spirit.
+	rider.visible = false
 	rider.root_offset = seat() - rider.rest_pos("torso")
 	rider.root_angle = tilt
 	_tack()

@@ -322,6 +322,9 @@ func _animate() -> void:
 		rig.scale.x = facing
 		rig.reset_physics_interpolation()  # turn around in one frame, not as a squash
 	rig.visible = not (invuln > 0.0 and not dead and int(t * 16.0) % 2 == 0)
+	# On horseback her far leg is on the other side of Spirit, out of sight.
+	for part in ["leg_far_upper", "leg_far_lower"]:
+		rig.info[part]["sprite"].visible = not mounted or dead
 
 	if dead:
 		# Lying down for a rest.
