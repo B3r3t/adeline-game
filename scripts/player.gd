@@ -14,14 +14,15 @@ const HEIGHT := 88.0
 const MAX_HEALTH := 5
 
 # Wand strike: weak but quick. Windup, a brief window where it can hit, then recovery.
-const STRIKE_WINDUP := 0.04
+const STRIKE_WINDUP := 0.06
 const STRIKE_ACTIVE := 0.1
-const STRIKE_RECOVERY := 0.1
+const STRIKE_RECOVERY := 0.14
 const STRIKE_REACH := 80.0
 const STRIKE_DAMAGE := 1
 
-# Fireball: three times the wand's damage, with a wait between casts.
-const FIREBALL_COOLDOWN := 2.0
+# Fireball: three times the wand's damage, with a short wait between casts.
+const FIREBALL_COOLDOWN := 1.2
+const CAST_POSE_TIME := 0.32
 const FIREBALL_DAMAGE := 3
 
 # Magic shield, earned from Mission 1.
@@ -30,7 +31,7 @@ const SHIELD_COOLDOWN := 2.2
 
 const HURT_INVULN := 0.9
 
-# Riding Spirit: faster, with a longer jump. No attacks from the saddle.
+# Riding Spirit: faster, with a longer jump. Fireballs work from the saddle.
 const RIDE_SPEED := 560.0
 const RIDE_JUMP := -820.0
 
@@ -56,6 +57,7 @@ var jump_buffer := 0.0
 var anim_time := 0.0
 var mounted := false
 var cast_time := 9.0  # seconds since the last fireball, for the casting pose
+var walk_phase := 0.0
 var rig = null
 var min_x := -INF
 var max_x := INF
@@ -91,6 +93,7 @@ func reset(at: Vector2) -> void:
 	invuln = 0.0
 	knock = 0.0
 	mounted = false
+	reset_physics_interpolation()
 
 
 func body_rect() -> Rect2:
@@ -120,6 +123,7 @@ func _physics_process(delta: float) -> void:
 		coyote = maxf(coyote - delta, 0.0)
 	else:
 		coyote = 0.1
+		walk_phase += absf(velocity.x) * delta * 0.06
 
 	var locked: bool = dead or game.input_locked()
 	var dir := 0.0 if locked else Input.get_axis("move_left", "move_right")
@@ -156,14 +160,14 @@ func _read_actions(delta: float) -> void:
 		coyote = 0.0
 	if Input.is_action_just_released("jump") and velocity.y < -260.0:
 		velocity.y = -260.0  # letting go early makes a shorter hop
+	if Input.is_action_just_pressed("fireball") and fireball_cd <= 0.0:
+		_cast_fireball()
 	if mounted:
 		return
 
 	if Input.is_action_just_pressed("strike") and not is_striking():
 		strike_time = 0.0
 		strike_hits.clear()
-	if Input.is_action_just_pressed("fireball") and fireball_cd <= 0.0:
-		_cast_fireball()
 	if Input.is_action_just_pressed("shield") and game.has_shield() and shield_cd <= 0.0:
 		shield_time = SHIELD_TIME
 		shield_cd = SHIELD_COOLDOWN
@@ -196,7 +200,7 @@ func _cast_fireball() -> void:
 	fb.game = game
 	fb.direction = facing
 	fb.damage = FIREBALL_DAMAGE
-	fb.position = position + Vector2(facing * 44.0, -58.0)
+	fb.position = position + Vector2(facing * 46.0, -54.0 + rig.root_offset.y)
 	game.add_projectile(fb)
 
 
@@ -221,75 +225,123 @@ func take_hit(from_x: float) -> int:
 	return HURT
 
 
+func _ease_out(k: float) -> float:
+	return 1.0 - (1.0 - k) * (1.0 - k)
+
+
 func _animate() -> void:
 	var t := anim_time
 	var sway := sin(t * 2.4)
-	var pose := { "cloak_back": 2.0 + sway * 2.0, "ponytail": sway * 3.0 }
-	rig.root_offset = Vector2.ZERO
+	var pose := {
+		"cloak_back": 2.0 + sway * 2.0, "ponytail": sway * 3.0,
+		"torso": sway * 0.6, "arm_upper": sway * 1.5, "head": -sway * 0.6,
+	}
+	var offset := Vector2.ZERO
 	rig.root_angle = 0.0
-	rig.scale.x = facing
+	if rig.scale.x != facing:
+		rig.scale.x = facing
+		rig.reset_physics_interpolation()  # turn around in one frame, not as a squash
 	rig.visible = not (invuln > 0.0 and not dead and int(t * 16.0) % 2 == 0)
 
 	if dead:
 		# Lying down for a rest.
 		rig.root_angle = -PI / 2.0
-		rig.root_offset = Vector2(-10.0, -rig.rest_pos("torso").y - 12.0)
+		offset = Vector2(-10.0, -rig.rest_pos("torso").y - 12.0)
 	elif mounted:
 		var pace := clampf(absf(velocity.x) / RIDE_SPEED, 0.0, 1.0)
-		pose["leg_near"] = -62.0
-		pose["leg_far"] = -62.0
-		pose["arm"] = -8.0
-		pose["cloak_back"] = 4.0 + pace * 22.0 + sway * 3.0
-		pose["ponytail"] = pace * 18.0 + sway * 3.0
-		rig.root_offset = game.horse.seat() - rig.rest_pos("torso")
+		pose["leg_near_upper"] = -55.0
+		pose["leg_near_lower"] = 60.0
+		pose["leg_far_upper"] = -55.0
+		pose["leg_far_lower"] = 60.0
+		pose["arm_upper"] = -14.0
+		pose["arm_lower"] = 8.0
+		pose["torso"] = 3.0 + pace * 5.0
+		pose["cloak_back"] = 4.0 + pace * 24.0 + sway * 3.0
+		pose["ponytail"] = pace * 20.0 + sway * 3.0
+		offset = game.horse.seat() - rig.rest_pos("torso")
 	elif not is_on_floor():
 		var falling := velocity.y > 0.0
-		pose["leg_near"] = -30.0
-		pose["leg_far"] = 24.0
-		pose["cloak_back"] = 34.0 if falling else 16.0
-		pose["ponytail"] = 26.0 if falling else 10.0
-		pose["arm"] = -20.0
+		pose["leg_near_upper"] = -20.0 if falling else -40.0
+		pose["leg_near_lower"] = 22.0 if falling else 54.0
+		pose["leg_far_upper"] = 12.0 if falling else 20.0
+		pose["leg_far_lower"] = 14.0 if falling else 24.0
+		pose["arm_upper"] = -34.0 if falling else -22.0
+		pose["cloak_back"] = 36.0 if falling else 16.0
+		pose["ponytail"] = 28.0 if falling else 10.0
 	elif absf(velocity.x) > 20.0:
-		var step := sin(t * 12.0)
-		pose["leg_near"] = step * 28.0
-		pose["leg_far"] = -step * 28.0
-		pose["arm"] = -step * 6.0
-		pose["cloak_back"] = 12.0 + step * 3.0
-		pose["ponytail"] = 10.0 + step * 3.0
-		rig.root_offset.y = -absf(cos(t * 12.0)) * 2.0
+		# Steps are tied to distance covered, so her feet do not slide.
+		var ph := walk_phase
+		pose["leg_near_upper"] = sin(ph) * 28.0
+		pose["leg_near_lower"] = maxf(0.0, -cos(ph)) * 50.0
+		pose["leg_far_upper"] = sin(ph + PI) * 28.0
+		pose["leg_far_lower"] = maxf(0.0, -cos(ph + PI)) * 50.0
+		pose["arm_upper"] = -sin(ph) * 10.0
+		pose["arm_lower"] = -6.0
+		pose["torso"] = 4.0
+		pose["head"] = -2.0
+		pose["cloak_back"] = 14.0 + sin(ph * 2.0) * 3.0
+		pose["ponytail"] = 12.0 + sin(ph * 2.0 + 1.0) * 4.0
+		offset.y = -absf(sin(ph)) * 2.5
 
-	# Actions take over the wand arm. The cloak sweeps back so the swing reads clearly.
-	if not dead and not mounted:
-		if is_striking():
-			var k := clampf(strike_time / (STRIKE_WINDUP + STRIKE_ACTIVE), 0.0, 1.0)
-			pose["arm"] = lerpf(-105.0, 45.0, k)
-			pose["torso"] = lerpf(-4.0, 8.0, k)
-			pose["cloak_back"] = 20.0
-		elif cast_time < 0.25:
-			pose["arm"] = 32.0
-			pose["torso"] = 5.0
-			pose["cloak_back"] = 18.0
+	# Wand actions. Each has a wind-up, the action itself, and an easy return.
+	if not dead:
+		if is_striking() and not mounted:
+			var s := strike_time
+			if s < STRIKE_WINDUP:
+				var k := s / STRIKE_WINDUP
+				pose["arm_upper"] = lerpf(0.0, -125.0, k)
+				pose["arm_lower"] = lerpf(0.0, -45.0, k)
+				pose["torso"] = -7.0 * k
+			elif s < STRIKE_WINDUP + STRIKE_ACTIVE:
+				var k := _ease_out((s - STRIKE_WINDUP) / STRIKE_ACTIVE)
+				pose["arm_upper"] = lerpf(-125.0, 42.0, k)
+				pose["arm_lower"] = lerpf(-45.0, 42.0, k)
+				pose["torso"] = lerpf(-7.0, 9.0, k)
+				offset.x += 6.0 * k
+			else:
+				var k := _ease_out((s - STRIKE_WINDUP - STRIKE_ACTIVE) / STRIKE_RECOVERY)
+				pose["arm_upper"] = lerpf(42.0, 0.0, k)
+				pose["arm_lower"] = lerpf(42.0, 0.0, k)
+				pose["torso"] = lerpf(9.0, 0.0, k)
+				offset.x += 6.0 * (1.0 - k)
+			pose["cloak_back"] = 22.0
+		elif cast_time < CAST_POSE_TIME:
+			# Thrust the wand forward, then ease back.
+			var k := _ease_out(cast_time / CAST_POSE_TIME)
+			pose["arm_upper"] = lerpf(-38.0, float(pose.get("arm_upper", 0.0)), k)
+			pose["arm_lower"] = lerpf(88.0, float(pose.get("arm_lower", 0.0)), k)
+			if not mounted:
+				pose["torso"] = lerpf(8.0, float(pose.get("torso", 0.0)), k)
+				offset.x += 4.0 * (1.0 - k)
+			pose["cloak_back"] = float(pose.get("cloak_back", 0.0)) + 14.0 * (1.0 - k)
 		elif is_shielding():
-			pose["arm"] = -70.0
-		if invuln > HURT_INVULN - 0.3:
+			pose["arm_upper"] = -95.0
+			pose["arm_lower"] = -20.0
+		if invuln > HURT_INVULN - 0.3 and not mounted:
 			pose["torso"] = -12.0
 			pose["head"] = 10.0
+	rig.root_offset = offset
 	rig.pose = pose
 	rig.apply()
 
 
 func _draw() -> void:
 	# Effects only. Adeline herself is the rig.
-	if is_striking() and not dead:
-		var total := STRIKE_WINDUP + STRIKE_ACTIVE
-		if strike_time >= STRIKE_WINDUP and strike_time < total:
-			var f := float(facing)
-			var hand := Vector2(f * 18.0, -58.0)
-			draw_arc(hand, STRIKE_REACH - 20.0, -1.3 if f > 0.0 else PI - 0.7, 0.7 if f > 0.0 else PI + 1.3, 12, Color(1.0, 1.0, 1.0, 0.8), 8.0)
-	var centre := Vector2(0.0, -HEIGHT / 2.0 - 6.0)
+	var f := float(facing)
+	if is_striking() and not dead and strike_time >= STRIKE_WINDUP:
+		# A crescent of magic sweeps out from the wand to the full reach of the strike.
+		var k := clampf((strike_time - STRIKE_WINDUP) / (STRIKE_ACTIVE + STRIKE_RECOVERY), 0.0, 1.0)
+		var radius := lerpf(26.0, STRIKE_REACH + 4.0, _ease_out(k))
+		var alpha := 1.0 - k
+		var centre := Vector2(f * 6.0, -60.0)
+		var from := -1.15 if f > 0.0 else PI - 0.75
+		var to := 0.75 if f > 0.0 else PI + 1.15
+		draw_arc(centre, radius, from, to, 16, Color(0.75, 0.55, 1.0, 0.55 * alpha), 14.0 * (1.0 - k * 0.5))
+		draw_arc(centre, radius + 2.0, from + 0.15, to - 0.15, 16, Color(1.0, 0.97, 0.8, alpha), 5.0)
+	var middle := Vector2(0.0, -HEIGHT / 2.0 - 6.0)
 	if is_shielding():
-		draw_circle(centre, 66.0, Color(0.45, 0.75, 1.0, 0.28))
-		draw_arc(centre, 66.0, 0.0, TAU, 40, Color(0.7, 0.9, 1.0, 0.9), 5.0)
+		draw_circle(middle, 66.0, Color(0.45, 0.75, 1.0, 0.28))
+		draw_arc(middle, 66.0, 0.0, TAU, 40, Color(0.7, 0.9, 1.0, 0.9), 5.0)
 	if block_flash > 0.0:
 		var grow := 66.0 + (0.35 - block_flash) * 120.0
-		draw_arc(centre, grow, 0.0, TAU, 40, Color(1.0, 1.0, 1.0, block_flash / 0.35), 8.0)
+		draw_arc(middle, grow, 0.0, TAU, 40, Color(1.0, 1.0, 1.0, block_flash / 0.35), 8.0)

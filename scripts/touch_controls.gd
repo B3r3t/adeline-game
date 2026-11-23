@@ -46,8 +46,8 @@ func _visible(id: String) -> bool:
 		return game.has_shield() and not game.player.mounted
 	if id == "interact":
 		return game.context_action != ""
-	if game.player.mounted and (id == "strike" or id == "fireball"):
-		return false  # no attacks from the saddle
+	if game.player.mounted and id == "strike":
+		return false  # the wand strike needs her feet on the ground
 	return true
 
 

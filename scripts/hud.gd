@@ -36,8 +36,7 @@ func _draw() -> void:
 	if game == null or game.player == null:
 		return
 	var s := get_viewport_rect().size
-	var version := str(ProjectSettings.get_setting("application/config/version", ""))
-	_text(Vector2(0.0, 36.0), "build %s   %d fps" % [version, int(Engine.get_frames_per_second())], 16, Color(1.0, 1.0, 1.0, 0.8), HORIZONTAL_ALIGNMENT_RIGHT, s.x - 40.0)
+	_text(Vector2(0.0, 36.0), "build %d   %d fps" % [game.build_number(), int(Engine.get_frames_per_second())], 16, Color(1.0, 1.0, 1.0, 0.8), HORIZONTAL_ALIGNMENT_RIGHT, s.x - 40.0)
 
 	if game.mode == "title":
 		_draw_title(s)
@@ -73,6 +72,8 @@ func _draw_title(s: Vector2) -> void:
 	var saved: bool = game.has_save()
 	var pulse := 0.75 + 0.25 * sin(game.clock * 3.0)
 	_text(Vector2(0.0, s.y * 0.64), "Tap to continue" if saved else "Tap to start", 40, Color(1.0, 1.0, 1.0, pulse), HORIZONTAL_ALIGNMENT_CENTER, s.x)
+	if game.update_note != "":
+		_text(Vector2(0.0, s.y * 0.64 + 44.0), game.update_note, 22, Color(1.0, 0.92, 0.5), HORIZONTAL_ALIGNMENT_CENTER, s.x)
 	if saved:
 		var r: Rect2 = game.new_game_rect()
 		draw_rect(r, Color(0.6, 0.2, 0.2, 0.85) if game.new_game_armed else Color(1.0, 1.0, 1.0, 0.16))

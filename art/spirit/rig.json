@@ -4,7 +4,7 @@
   {
    "name": "body",
    "parent": "",
-   "z": 2,
+   "z": 5,
    "pos": [
     0.0,
     -69.93
@@ -28,9 +28,9 @@
    ]
   },
   {
-   "name": "leg_hind_far",
+   "name": "leg_hind_far_upper",
    "parent": "body",
-   "z": 1,
+   "z": 2,
    "pos": [
     -42.7,
     -1.6
@@ -41,9 +41,22 @@
    ]
   },
   {
-   "name": "leg_front_far",
-   "parent": "body",
+   "name": "leg_hind_far_lower",
+   "parent": "leg_hind_far_upper",
    "z": 1,
+   "pos": [
+    -17.62,
+    32.03
+   ],
+   "pivot": [
+    11.74,
+    88.08
+   ]
+  },
+  {
+   "name": "leg_front_far_upper",
+   "parent": "body",
+   "z": 4,
    "pos": [
     20.28,
     -3.74
@@ -54,9 +67,22 @@
    ]
   },
   {
-   "name": "leg_hind_near",
-   "parent": "body",
+   "name": "leg_front_far_lower",
+   "parent": "leg_front_far_upper",
    "z": 3,
+   "pos": [
+    -1.33,
+    34.16
+   ],
+   "pivot": [
+    20.55,
+    91.6
+   ]
+  },
+  {
+   "name": "leg_hind_near_upper",
+   "parent": "body",
+   "z": 7,
    "pos": [
     -49.64,
     0.0
@@ -67,9 +93,22 @@
    ]
   },
   {
-   "name": "leg_front_near",
+   "name": "leg_hind_near_lower",
+   "parent": "leg_hind_near_upper",
+   "z": 6,
+   "pos": [
+    -17.62,
+    32.03
+   ],
+   "pivot": [
+    11.74,
+    88.08
+   ]
+  },
+  {
+   "name": "leg_front_near_upper",
    "parent": "body",
-   "z": 3,
+   "z": 9,
    "pos": [
     14.41,
     -2.14
@@ -77,6 +116,19 @@
    "pivot": [
     23.49,
     16.44
+   ]
+  },
+  {
+   "name": "leg_front_near_lower",
+   "parent": "leg_front_near_upper",
+   "z": 8,
+   "pos": [
+    -1.33,
+    34.16
+   ],
+   "pivot": [
+    20.55,
+    91.6
    ]
   }
  ]

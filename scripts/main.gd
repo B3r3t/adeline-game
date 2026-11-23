@@ -26,6 +26,8 @@ const RIVER_X := 5080.0
 const TALK_RANGE := 120.0
 const RIDE_RANGE := 100.0
 const SAVE_PATH := "user://save.json"
+# Where the game looks for newer content. The files are published by the build on GitHub.
+const UPDATE_URL := "https://github.com/B3r3t/adeline-game/releases/download/latest/"
 const ART_SCALE := 1.0 / 2.2  # scenery art is drawn at 2.2 pixels per world pixel
 const GROUND_ART_HEIGHT := 170.0  # how tall the grass-and-soil strip is in the world
 const GRASS_RISE := 24.0  # how far the grass tufts stand above the line characters walk on
@@ -61,6 +63,13 @@ var camera: Camera2D
 var hills_far: Sprite2D
 var hills_near: Sprite2D
 var ground_art: Texture2D
+var cam_pos := Vector2.ZERO  # where the camera is, eased toward Adeline
+
+# Shared pieces for glowing effects such as the fireball.
+var spark: GradientTexture2D
+var additive: CanvasItemMaterial
+var fire_ramp: Gradient
+var shrink: Curve
 var camps: Array = []
 var hud = null
 var controls = null
@@ -78,12 +87,15 @@ var toast_text := ""
 var toast_time := 0.0
 var context_action := ""  # talk, boat or nothing
 var new_game_armed := false
+var update_note := ""  # shown on the title screen
+var guard_cleared := false
 var clock := 0.0
 
 
 func _ready() -> void:
 	font = ThemeDB.fallback_font
 	_setup_input()
+	_build_effects()
 	_build_backdrop()
 	_build_ground()
 	_build_scenery()
@@ -105,8 +117,9 @@ func _ready() -> void:
 	camera.limit_left = int(LEVEL_LEFT)
 	camera.limit_right = int(LEVEL_RIGHT)
 	camera.zoom = Vector2(CAMERA_ZOOM, CAMERA_ZOOM)
-	camera.position_smoothing_enabled = true
-	camera.position_smoothing_speed = 6.0
+	# The camera, hills and characters all move on the same clock (the physics tick) and are
+	# smoothed between ticks by the engine. Mixing clocks is what makes scrolling judder.
+	camera.process_callback = Camera2D.CAMERA2D_PROCESS_PHYSICS
 	add_child(camera)
 	camera.make_current()
 
@@ -127,8 +140,7 @@ func _ready() -> void:
 
 	_load()
 	_place_player()
-	camera.position = _camera_target()
-	camera.reset_smoothing()
+	_check_for_update()
 
 
 # --- Setup ------------------------------------------------------------------
@@ -150,6 +162,29 @@ func _add_action(action: String, keys: Array) -> void:
 		var ev := InputEventKey.new()
 		ev.physical_keycode = k
 		InputMap.action_add_event(action, ev)
+
+
+func _build_effects() -> void:
+	# A soft round glow, drawn brighter where glows overlap.
+	var falloff := Gradient.new()
+	falloff.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
+	falloff.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+	spark = GradientTexture2D.new()
+	spark.gradient = falloff
+	spark.width = 48
+	spark.height = 48
+	spark.fill = GradientTexture2D.FILL_RADIAL
+	spark.fill_from = Vector2(0.5, 0.5)
+	spark.fill_to = Vector2(1.0, 0.5)
+	additive = CanvasItemMaterial.new()
+	additive.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	fire_ramp = Gradient.new()
+	fire_ramp.set_color(0, Color(1.0, 0.95, 0.6, 1.0))
+	fire_ramp.set_color(1, Color(0.9, 0.15, 0.05, 0.0))
+	fire_ramp.add_point(0.4, Color(1.0, 0.55, 0.12, 0.9))
+	shrink = Curve.new()
+	shrink.add_point(Vector2(0.0, 1.0))
+	shrink.add_point(Vector2(1.0, 0.0))
 
 
 func _build_backdrop() -> void:
@@ -256,6 +291,76 @@ func has_shield() -> bool:
 	return bool(data["shield"])
 
 
+# --- Updates over the internet ----------------------------------------------
+# On the title screen the game asks GitHub for the newest build number. If it is newer,
+# the new content downloads quietly and is used the next time the game is opened.
+
+func build_number() -> int:
+	return int(Engine.get_meta("build", 0))
+
+
+func _update_url() -> String:
+	var override := OS.get_environment("ADELINE_UPDATE_URL")  # for testing
+	return override if override != "" else UPDATE_URL
+
+
+func _check_for_update() -> void:
+	var req := HTTPRequest.new()
+	add_child(req)
+	req.timeout = 15.0
+	req.request_completed.connect(_on_update_info.bind(req))
+	if req.request(_update_url() + "version.json") != OK:
+		req.queue_free()
+
+
+func _on_update_info(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray, req: HTTPRequest) -> void:
+	req.queue_free()
+	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
+		return  # offline, or nothing published: carry on as normal
+	var info = JSON.parse_string(body.get_string_from_utf8())
+	if not (info is Dictionary):
+		return
+	var latest := int(info.get("build", 0))
+	if latest <= build_number():
+		return
+	if int(Engine.get_meta("installed_build", 0)) < int(info.get("min_app_build", 0)):
+		update_note = "A new version is out. Install it from the download page."
+		return
+	if FileAccess.file_exists("user://update.json"):
+		var have = JSON.parse_string(FileAccess.get_file_as_string("user://update.json"))
+		if have is Dictionary and int(have.get("build", 0)) >= latest:
+			update_note = "Update ready. Close and reopen the game to play it."
+			return
+	update_note = "Downloading an update..."
+	var dl := HTTPRequest.new()
+	add_child(dl)
+	dl.download_file = "user://update.tmp"
+	dl.request_completed.connect(_on_update_pack.bind(dl, latest, int(info.get("size", 0))))
+	if dl.request(_update_url() + "adeline.pck") != OK:
+		dl.queue_free()
+		update_note = ""
+
+
+func _on_update_pack(result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray, dl: HTTPRequest, latest: int, size: int) -> void:
+	dl.queue_free()
+	var dir := DirAccess.open("user://")
+	var good := result == HTTPRequest.RESULT_SUCCESS and code == 200 and dir != null
+	if good and size > 0:
+		var file := FileAccess.open("user://update.tmp", FileAccess.READ)
+		good = file != null and file.get_length() == size  # a cut-off download is thrown away
+	if not good:
+		update_note = ""
+		if dir != null and dir.file_exists("update.tmp"):
+			dir.remove("update.tmp")
+		return
+	if dir.file_exists("update.pck"):
+		dir.remove("update.pck")
+	dir.rename("update.tmp", "update.pck")
+	var note := FileAccess.open("user://update.json", FileAccess.WRITE)
+	note.store_string(JSON.stringify({ "build": latest }))
+	update_note = "Update ready. Close and reopen the game to play it."
+
+
 # --- Starting and placing ---------------------------------------------------
 
 func _start(new_game: bool) -> void:
@@ -277,6 +382,7 @@ func _place_player() -> void:
 	# Spirit starts in the stable, or close by when continuing from far along the island.
 	horse.place(STABLE_X if cx < 1000.0 else cx - 130.0)
 	_update_limits()
+	_update_camera(0.0, true)
 
 
 func _update_limits() -> void:
@@ -397,6 +503,7 @@ func _retry() -> void:
 	defeated = false
 	player.reset(Vector2(float(encounter["left"]) + 90.0, GROUND_Y))
 	_spawn_goblins()
+	_update_camera(0.0, true)
 
 
 func _check_triggers() -> void:
@@ -458,6 +565,7 @@ func _mount() -> void:
 		return
 	player.mounted = true
 	player.position.x = horse.position.x
+	player.reset_physics_interpolation()
 	player.facing = horse.facing
 	horse.set_mounted(true)
 
@@ -611,6 +719,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_update_camera(delta, false)
 	if mode != "play":
 		return
 	if defeated:
@@ -628,26 +737,46 @@ func _physics_process(delta: float) -> void:
 
 
 func _camera_target() -> Vector2:
-	var view_h := get_viewport_rect().size.y
-	# Keep the ground about three quarters of the way down the screen on any device.
-	return Vector2(player.position.x + player.facing * 60.0, GROUND_Y - 0.24 * view_h / CAMERA_ZOOM)
+	var view := get_viewport_rect().size / CAMERA_ZOOM
+	# Look a little ahead of Adeline, and keep the ground about three quarters of the way down.
+	var x: float = player.position.x + player.facing * 45.0
+	x = clampf(x, LEVEL_LEFT + view.x / 2.0, LEVEL_RIGHT - view.x / 2.0)
+	return Vector2(x, GROUND_Y - 0.24 * view.y)
+
+
+## Eases the camera toward Adeline and slides the hills behind it. With snap, it jumps
+## straight there, for moments when she is placed somewhere new.
+func _update_camera(delta: float, snap: bool) -> void:
+	var target := _camera_target()
+	if snap:
+		cam_pos = target
+	else:
+		var ease := 1.0 - exp(-7.0 * delta)
+		cam_pos.x = lerpf(cam_pos.x, target.x, ease)
+		cam_pos.y = target.y
+	camera.position = cam_pos
+	hills_far.position.x = STRIP_START + cam_pos.x * 0.85
+	hills_near.position.x = STRIP_START + cam_pos.x * 0.6
+	var boat_h := boat.texture.get_size().y * ART_SCALE
+	boat.position.y = GROUND_Y + 34.0 - boat_h + sin(clock * 2.0) * 5.0
+	if snap:
+		for node in [camera, hills_far, hills_near, boat]:
+			node.reset_physics_interpolation()
 
 
 func _process(delta: float) -> void:
 	clock += delta
+	if not guard_cleared and clock > 3.0:
+		# The game has been running fine for a few seconds, so any update just loaded is good.
+		guard_cleared = true
+		if FileAccess.file_exists("user://update_loading"):
+			DirAccess.remove_absolute(ProjectSettings.globalize_path("user://update_loading"))
 	toast_time = maxf(toast_time - delta, 0.0)
 	goblins = goblins.filter(func(g): return is_instance_valid(g))
-	camera.position = _camera_target()
-	var cam_x := camera.get_screen_center_position().x
-	hills_far.position.x = STRIP_START + cam_x * 0.85
-	hills_near.position.x = STRIP_START + cam_x * 0.6
-	# A goblin camp packs up once its goblins are beaten.
+	# Merlin turns to face Adeline. A goblin camp packs up once its goblins are beaten.
+	merlin.flip_h = player.position.x < MERLIN_X
 	for n in camps.size():
 		camps[n].visible = n >= cleared()
-	# Merlin turns to face Adeline, and the boat hovers over the river.
-	merlin.flip_h = player.position.x < MERLIN_X
-	var boat_h := boat.texture.get_size().y * ART_SCALE
-	boat.position.y = GROUND_Y + 34.0 - boat_h + sin(clock * 2.0) * 5.0
 	queue_redraw()
 
 

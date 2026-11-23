@@ -4,7 +4,7 @@
   {
    "name": "torso",
    "parent": "",
-   "z": 2,
+   "z": 3,
    "pos": [
     0.0,
     -47.16
@@ -15,9 +15,9 @@
    ]
   },
   {
-   "name": "leg_far",
+   "name": "leg_far_upper",
    "parent": "torso",
-   "z": 1,
+   "z": 2,
    "pos": [
     1.43,
     -0.32
@@ -28,9 +28,22 @@
    ]
   },
   {
-   "name": "leg_near",
+   "name": "leg_far_lower",
+   "parent": "leg_far_upper",
+   "z": 1,
+   "pos": [
+    -2.38,
+    20.32
+   ],
+   "pivot": [
+    13.97,
+    51.7
+   ]
+  },
+  {
+   "name": "leg_near_upper",
    "parent": "torso",
-   "z": 3,
+   "z": 5,
    "pos": [
     -1.11,
     -0.32
@@ -38,6 +51,19 @@
    "pivot": [
     19.21,
     6.99
+   ]
+  },
+  {
+   "name": "leg_near_lower",
+   "parent": "leg_near_upper",
+   "z": 4,
+   "pos": [
+    -2.38,
+    20.32
+   ],
+   "pivot": [
+    13.97,
+    51.7
    ]
   },
   {
@@ -54,9 +80,9 @@
    ]
   },
   {
-   "name": "arm",
+   "name": "arm_upper",
    "parent": "torso",
-   "z": 4,
+   "z": 7,
    "pos": [
     -1.43,
     -28.26
@@ -67,9 +93,22 @@
    ]
   },
   {
+   "name": "arm_lower",
+   "parent": "arm_upper",
+   "z": 6,
+   "pos": [
+    -1.11,
+    12.7
+   ],
+   "pivot": [
+    13.27,
+    53.1
+   ]
+  },
+  {
    "name": "hood",
    "parent": "torso",
-   "z": 5,
+   "z": 8,
    "pos": [
     0.95,
     -32.71
@@ -82,7 +121,7 @@
   {
    "name": "head",
    "parent": "torso",
-   "z": 6,
+   "z": 9,
    "pos": [
     -1.11,
     -34.61
@@ -95,7 +134,7 @@
   {
    "name": "ponytail",
    "parent": "head",
-   "z": 7,
+   "z": 10,
    "pos": [
     -5.78,
     -15.56

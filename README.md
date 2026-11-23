@@ -25,8 +25,8 @@ Controls
 Combat numbers, all at the top of `scripts/player.gd` and `scripts/goblin.gd`
 
 - Wand strike: 1 damage, very quick.
-- Fireball: 3 damage, 2 seconds between casts.
-- Goblin: 8 health. Each attack warns for 0.9 seconds, then recovers for about a second.
+- Fireball: 3 damage, 1.2 seconds between casts. It also works from the saddle.
+- Goblin: 10 health. Each attack warns for 0.9 seconds, then recovers for about a second.
 
 ## Art
 
@@ -41,7 +41,8 @@ All of Mission 1 is in real art now.
   and the goblin camps are single pictures.
 - The ground and the two layers of hills are long strips that repeat sideways. The hills are
   faded toward the sky colour so the characters stand out in front of them.
-- Still plain shapes: the river water, the fireball, the hearts and the buttons.
+- Arms and legs bend at the elbow and knee: one drawn leg is split into two overlapping halves.
+- Still plain shapes: the river water, the hearts and the buttons. The fireball is drawn by code with a glow and sparks.
 
 - `art/adeline`, `art/spirit` and `art/goblin` hold the game textures and a `rig.json` that lists the joints.
 - `art/props` holds the scenery and Merlin. `art_src/build_props.py` sets how tall each one is in the game and how much the hills fade.
@@ -51,12 +52,32 @@ All of Mission 1 is in real art now.
 
 ## Getting the game onto a tablet
 
-Every change pushed to `main` is built into an installable app automatically.
-The newest one is always on the Releases page as `adeline.apk`.
+Every change pushed to `main` is built automatically. The Releases page always holds the newest:
+
+- `adeline.apk` is the app to install. It only needs installing once.
+- `adeline.pck` and `version.json` are the update. An installed game checks for these on its
+  title screen, downloads a newer one quietly, and uses it the next time the game is opened.
+  This needs the repository to be public, because the game downloads without signing in.
+
+How updating stays safe
+
+- A download that arrives cut short is thrown away.
+- If the game fails to start with a new update, the next start throws that update away and
+  runs the installed version.
+- Some changes cannot arrive as an update: a new Godot version or a change in `project.godot`.
+  For those, raise the number in `min_app_build.txt` to the build that must be installed.
+  Older installs then show a note on the title screen asking for a fresh install.
+
+How movement stays smooth
+
+- Characters, the camera and the hills all move on the physics tick, and Godot's physics
+  interpolation smooths them between ticks. Anything that moves should be moved in
+  `_physics_process`, not `_process`, or scrolling will judder again.
 
 ## Project layout
 
-- `scripts/main.gd` builds the island, runs the mission, fights and saving.
+- `scripts/boot.gd` runs first and loads a downloaded update if there is one.
+- `scripts/main.gd` builds the island, runs the mission, fights, saving and the update check.
 - `scripts/player.gd` is Adeline. Her speeds, reach and timings are at the top of the file.
 - `scripts/goblin.gd` is the goblin and its two attacks, with timings at the top.
 - `scripts/touch_controls.gd` is the on-screen buttons.

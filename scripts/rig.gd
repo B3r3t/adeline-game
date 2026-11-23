@@ -66,3 +66,9 @@ func rest_pos(part: String) -> Vector2:
 
 func tint(part: String, color: Color) -> void:
 	(info[part]["sprite"] as Sprite2D).modulate = color
+
+
+## Hides every part whose name does not start with the given text.
+func show_only(prefix: String) -> void:
+	for part in order:
+		(info[part]["sprite"] as Sprite2D).visible = str(part).begins_with(prefix)

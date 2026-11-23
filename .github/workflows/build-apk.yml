@@ -88,6 +88,17 @@ jobs:
           ls -la build
           test -s build/adeline.apk
 
+      - name: Export the update pack
+        run: |
+          # The same game content without the app around it. Installed copies of the game
+          # download this to update themselves, so nobody has to reinstall for every change.
+          ~/godot/godot --headless --path . --export-pack "Android" build/adeline.pck
+          test -s build/adeline.pck
+          size=$(stat -c %s build/adeline.pck)
+          floor=$(tr -d '[:space:]' < min_app_build.txt)
+          echo "{\"build\": ${GITHUB_RUN_NUMBER}, \"size\": ${size}, \"min_app_build\": ${floor}}" > build/version.json
+          cat build/version.json
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
@@ -101,10 +112,10 @@ jobs:
           title="Latest build (0.1.${GITHUB_RUN_NUMBER})"
           if gh release view latest >/dev/null 2>&1; then
             # Reuse the one release so its download link never goes missing mid-update.
-            gh release upload latest build/adeline.apk --clobber
+            gh release upload latest build/adeline.apk build/adeline.pck build/version.json --clobber
             gh release edit latest --title "$title" --draft=false
           else
-            gh release create latest build/adeline.apk \
+            gh release create latest build/adeline.apk build/adeline.pck build/version.json \
               --target "$GITHUB_SHA" \
               --title "$title" \
               --notes "Newest playable build of Adeline. Download adeline.apk on the tablet and tap it to install."

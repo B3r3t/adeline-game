@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dqah3ljog1md0"
-path="res://.godot/imported/leg_hind_near.png-75b48debc233e5047bba7e9a5321b268.ctex"
+uid="uid://cmf76r8jfct3s"
+path="res://.godot/imported/arm_lower.png-7599181beaad20ebfa4689fa586d6c79.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/spirit/leg_hind_near.png"
-dest_files=["res://.godot/imported/leg_hind_near.png-75b48debc233e5047bba7e9a5321b268.ctex"]
+source_file="res://art/adeline/arm_lower.png"
+dest_files=["res://.godot/imported/arm_lower.png-7599181beaad20ebfa4689fa586d6c79.ctex"]
 
 [params]
 

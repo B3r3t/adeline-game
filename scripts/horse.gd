@@ -18,7 +18,7 @@ var speed := 0.0  # ground speed, drives the leg animation
 var stride := 0.0
 var clock := 0.0
 var rig = null
-var rider_leg: Sprite2D
+var rider = null  # a second copy of Adeline's rig that shows only her near leg
 
 
 func _ready() -> void:
@@ -28,21 +28,15 @@ func _ready() -> void:
 	add_child(rig)
 	rig.build("res://art/spirit")
 	# The far legs sit in shadow.
-	rig.tint("leg_front_far", Color(0.72, 0.72, 0.78))
-	rig.tint("leg_hind_far", Color(0.72, 0.72, 0.78))
+	for part in ["leg_front_far_upper", "leg_front_far_lower", "leg_hind_far_upper", "leg_hind_far_lower"]:
+		rig.tint(part, Color(0.72, 0.72, 0.78))
 	# Borrow Adeline's leg art for the rider's near leg.
-	var adeline = JSON.parse_string(FileAccess.get_file_as_string("res://art/adeline/rig.json"))
-	rider_leg = Sprite2D.new()
-	rider_leg.texture = load("res://art/adeline/leg_near.png")
-	rider_leg.centered = false
-	for part in adeline["parts"]:
-		if part["name"] == "leg_near":
-			rider_leg.offset = -Vector2(part["pivot"][0], part["pivot"][1])
-	var s := float(adeline["tex_scale"])
-	rider_leg.scale = Vector2(s, s)
-	rider_leg.rotation = deg_to_rad(-34.0)
-	rider_leg.visible = false
-	rig.add_child(rider_leg)
+	rider = Node2D.new()
+	rider.set_script(RigScript)
+	rig.add_child(rider)
+	rider.build("res://art/adeline")
+	rider.show_only("leg_near")
+	rider.visible = false
 
 
 func place(x: float) -> void:
@@ -51,6 +45,7 @@ func place(x: float) -> void:
 	facing = 1
 	speed = 0.0
 	z_index = 0
+	reset_physics_interpolation()
 
 
 func come() -> void:
@@ -106,20 +101,34 @@ func _move_to(x: float, pace: float, delta: float) -> bool:
 
 func _animate() -> void:
 	var pace := clampf(speed / 560.0, 0.0, 1.0)
-	rig.scale.x = facing
-	rig.pose = {
-		"leg_front_near": sin(stride) * 34.0 * pace,
-		"leg_front_far": sin(stride + 0.8) * 34.0 * pace,
-		"leg_hind_near": sin(stride + PI) * 30.0 * pace,
-		"leg_hind_far": sin(stride + PI + 0.8) * 30.0 * pace,
-		"tail": sin(clock * 2.0) * 5.0 + pace * 26.0,
-		"body": sin(stride * 2.0) * 2.5 * pace,
-	}
-	rig.root_offset = Vector2(0.0, -absf(sin(stride)) * 5.0 * pace)
+	if rig.scale.x != facing:
+		rig.scale.x = facing
+		rig.reset_physics_interpolation()
+	var pose := { "tail": sin(clock * 2.0) * 5.0 + pace * 26.0, "body": sin(stride) * 2.5 * pace }
+	# A gallop: each leg reaches forward, folds at the joint as it swings through, then pushes back.
+	_leg(pose, "leg_front_near", stride, pace, true)
+	_leg(pose, "leg_front_far", stride + 0.7, pace, true)
+	_leg(pose, "leg_hind_near", stride + 2.1, pace, false)
+	_leg(pose, "leg_hind_far", stride + 2.8, pace, false)
+	rig.pose = pose
+	rig.root_offset = Vector2(0.0, -absf(sin(stride)) * 6.0 * pace)
 	rig.apply()
 	# Adeline's near leg, drawn over Spirit's side while she rides.
-	rider_leg.visible = state == "mounted"
-	rider_leg.position = seat() + Vector2(2.0, 2.0)
+	rider.visible = state == "mounted"
+	rider.root_offset = seat() - rider.rest_pos("torso")
+	rider.pose = { "leg_near_upper": -52.0, "leg_near_lower": 62.0 }
+	rider.apply()
+
+
+func _leg(pose: Dictionary, part: String, phase: float, pace: float, front: bool) -> void:
+	var swing := sin(phase)
+	var through := maxf(0.0, -cos(phase))  # 1 in the middle of the forward swing
+	if front:
+		pose[part + "_upper"] = swing * 36.0 * pace
+		pose[part + "_lower"] = through * 72.0 * pace
+	else:
+		pose[part + "_upper"] = swing * 30.0 * pace
+		pose[part + "_lower"] = (minf(0.0, swing) * 34.0 - through * 26.0 + maxf(0.0, swing) * 10.0) * pace
 
 
 ## Where a rider sits, relative to Spirit's feet and facing right.
