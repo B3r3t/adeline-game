@@ -83,7 +83,7 @@ Spirit's stable" button.
   down with her.
 - Effects for the wand, fireball, shield, rings, knocked rails, rolling bales and landings.
 - "Sound: on / off" sits in the bottom-left corner of the title screen and is remembered.
-- The voices were recorded with a text-to-speech service. The effects are made from scratch
+- The voices were recorded with a text-to-speech service (Adeline uses the "Ainsley" voice, picked by ear). The effects are made from scratch
   by `art_src/build_audio.py`, which also trims and levels the recordings and writes
   `audio/manifest.json`. `scripts/sound.gd` plays everything; a sound missing from the list is
   simply silent. A new spoken line needs a recording added to that script's `MERLIN` list.
