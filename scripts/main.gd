@@ -743,7 +743,8 @@ func start_ride(number: int) -> void:
 	player.min_x = ride.START_X - 200.0
 	player.max_x = ride.START_X + ride.LENGTH + 300.0
 	horse.place(ride.START_X)
-	_mount()
+	player.mounted = true
+	horse.set_mounted(true)
 	ride.start(number)
 	_update_camera(0.0, true)
 
@@ -825,6 +826,8 @@ func _camera_target() -> Vector2:
 		# On the course Spirit sits toward the left so the next jump is in view early.
 		x = player.position.x + view.x * 0.24
 		x = clampf(x, ride.START_X - 300.0 + view.x / 2.0, ride.START_X + ride.LENGTH + 500.0 - view.x / 2.0)
+		# Follow the hills, looking at the ground a little ahead of Spirit rather than at her jumps.
+		return Vector2(x, ride.ground_y(player.position.x + 140.0) - 0.26 * view.y)
 	else:
 		x = clampf(x, LEVEL_LEFT + view.x / 2.0, LEVEL_RIGHT - view.x / 2.0)
 	return Vector2(x, GROUND_Y - 0.24 * view.y)
@@ -839,7 +842,7 @@ func _update_camera(delta: float, snap: bool) -> void:
 	else:
 		var ease := 1.0 - exp(-7.0 * delta)
 		cam_pos.x = lerpf(cam_pos.x, target.x, ease)
-		cam_pos.y = target.y
+		cam_pos.y = lerpf(cam_pos.y, target.y, 1.0 - exp(-4.0 * delta)) if mode == "ride" else target.y
 	camera.position = cam_pos
 	hills_far.position.x = STRIP_START + cam_pos.x * 0.85
 	hills_near.position.x = STRIP_START + cam_pos.x * 0.6
@@ -871,7 +874,7 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	var g := GROUND_Y
 	var left := LEVEL_LEFT - 600.0
-	var width: float = ride.START_X + ride.LENGTH + 1800.0  # covers the island and the riding course
+	var width: float = ride.START_X - 1200.0 - left  # the island; the riding course draws its own hills
 	# Deep soil, then the repeating grass-and-soil strip on top of it.
 	draw_rect(Rect2(left, g + 100.0, width, 700.0), Color(0.33, 0.17, 0.1))
 	var k := GROUND_ART_HEIGHT / ground_art.get_height()

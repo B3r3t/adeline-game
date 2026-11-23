@@ -1,40 +1,74 @@
 extends Node2D
-## The riding course. Spirit gallops on her own; the player jumps fences, hay bales and
-## logs, and times jumps to pass through golden rings. Nothing here can be lost: a knocked
-## obstacle just slows Spirit for a moment, and the course ends with one to three stars.
+## The riding course, run on real physics.
+##
+## The ground rolls. Spirit carries momentum: gravity slows her on the way up a hill and
+## speeds her up on the way down, she flies off any ledge the ground drops away from, and
+## she lands with whatever speed she still has along the slope. Jump rails, hay bales and
+## logs are rigid bodies. Clip one and it is knocked away at Spirit's own speed, then
+## tumbles, bounces and rolls by itself.
+##
+## Nothing here can be lost: a knocked obstacle costs Spirit some of her speed, and the
+## course ends with one to three stars.
 
 const START_X := 8000.0
 const LENGTH := 14000.0
 const BASE_SPEED := 470.0
 const FAST_SPEED := 600.0
 const SLOW_SPEED := 350.0
-const RIDER_HEIGHT := 112.0  # how far above Spirit's hooves the middle of Adeline is
-const RING_OPENING := 58.0  # how far off-centre she can be and still pass through a ring
-const HORSE_HALF := 40.0  # half of Spirit's length, for touching obstacles
 const ART_SCALE := 1.0 / 2.2
 
-# What each obstacle needs: how high Spirit's hooves must be, and half its width.
-const OBSTACLES := {
-	"fence": { "clear": 50.0, "half": 20.0 },
-	"bale": { "clear": 46.0, "half": 24.0 },
-	"log": { "clear": 28.0, "half": 40.0 },
-}
+# The forces on Spirit.
+const GRAVITY := 1900.0
+const JUMP := -820.0
+const DRIVE_GAIN := 1.7  # how hard she works to get back to the pace she is asked for
+const PUSH_MAX := 680.0  # the most her legs can add, per second
+const BRAKE_MAX := 240.0  # she holds back only gently, so downhills really are faster
+const MAX_SPEED := 900.0
+const MIN_SPEED := 230.0
+const KNOCK_KEEPS := 0.6  # the share of her speed she keeps after clipping something
+const TICK := 1.0 / 60.0  # the step used when working out a jump in advance
+
+const RIDER_HEIGHT := 112.0  # how far above Spirit's hooves the middle of Adeline is
+const RING_OPENING := 58.0  # how far off-centre she can be and still pass through a ring
+const PIECES := 4  # the collision layer for things that can be knocked over
+
+# The jump is one picture, cut into the parts that stand still and the three rails.
+const FENCE_STILL := [Rect2(0, 0, 47, 136), Rect2(215, 0, 48, 136), Rect2(47, 92, 168, 44)]
+const FENCE_RAILS := [Rect2(47, 30, 168, 17), Rect2(47, 52, 168, 19), Rect2(47, 76, 168, 16)]
+
+
+## Where Spirit is and how she is moving.
+class Rider:
+	var x := 0.0
+	var y := 0.0
+	var vx := 0.0
+	var vy := 0.0
+	var speed := 0.0  # along the ground, while her hooves are on it
+	var grounded := true
+	var impact := 0.0  # how hard she last came down
+
 
 var game = null
 var active := false
 var finished := false
 var course := 1
+var rider := Rider.new()
 var items: Array = []
+var hills: Array = []  # [height, wave number, phase] for each layer of rolling ground
+var ledges: Array = []  # [start, rise length, drop length, height]
+var roughness := 1.0
+var nominal := PackedFloat32Array()  # the speed an unhurried ride has at each point
 var rings_total := 0
 var rings_got := 0
 var jumps_clean := 0
 var stumbles := 0
-var stumble_time := 0.0
+var air_time := 0.0
 var finish_x := 0.0
 var finish_time := 0.0
 var run_time := 0.0
 var stars := 0
 var last_x := 0.0
+var shadow: Sprite2D = null
 
 
 func clear() -> void:
@@ -43,6 +77,9 @@ func clear() -> void:
 	for child in get_children():
 		child.queue_free()
 	items.clear()
+	hills.clear()
+	ledges.clear()
+	shadow = null
 
 
 func start(number: int) -> void:
@@ -52,16 +89,17 @@ func start(number: int) -> void:
 	rings_got = 0
 	jumps_clean = 0
 	stumbles = 0
-	stumble_time = 0.0
+	air_time = 0.0
 	finish_time = 0.0
 	run_time = 0.0
 	stars = 0
 	last_x = START_X
 	_build()
+	rider = _rider_at(START_X, 0.0)
 	active = true
 
 
-## Spirit's speed right now. The arrows nudge it slower or faster.
+## The pace Spirit is asked for. The arrows ask for a slower or faster one.
 func pace(axis: float) -> float:
 	if finished:
 		return 0.0
@@ -70,10 +108,143 @@ func pace(axis: float) -> float:
 		speed = lerpf(BASE_SPEED, FAST_SPEED, axis)
 	elif axis < 0.0:
 		speed = lerpf(BASE_SPEED, SLOW_SPEED, -axis)
-	speed *= 1.0 + 0.05 * minf(course - 1, 6.0)
-	if stumble_time > 0.0:
-		speed *= 0.4
-	return speed
+	return speed * (1.0 + 0.05 * minf(course - 1, 6.0))
+
+
+# --- The ground --------------------------------------------------------------
+
+## How high the ground stands above the flat at this point.
+func elevation(x: float) -> float:
+	var u := x - START_X
+	var e := 0.0
+	for h in hills:
+		e += float(h[0]) * 0.5 * (1.0 - cos(float(h[1]) * u + float(h[2])))
+	# Flat at the start and at the finish.
+	e *= roughness * smoothstep(500.0, 1200.0, u) * (1.0 - smoothstep(LENGTH - 1500.0, LENGTH - 850.0, u))
+	for l in ledges:
+		var t: float = x - float(l[0])
+		var up: float = l[1]
+		if t <= 0.0 or t >= up + float(l[2]):
+			continue
+		if t <= up:
+			e += float(l[3]) * (t / up) * (t / up)  # a ramp that gets steeper, then stops dead
+		else:
+			e += float(l[3]) * (1.0 - smoothstep(0.0, 1.0, (t - up) / float(l[2])))
+	return e
+
+
+## The line Spirit's hooves run along.
+func ground_y(x: float) -> float:
+	return game.GROUND_Y - elevation(x)
+
+
+## How steeply the ground falls (above zero) or climbs (below zero) here.
+func slope(x: float) -> float:
+	return (ground_y(x + 3.0) - ground_y(x - 3.0)) / 6.0
+
+
+func _slope_behind(x: float) -> float:
+	return (ground_y(x) - ground_y(x - 3.0)) / 3.0
+
+
+# --- How Spirit moves --------------------------------------------------------
+
+func _rider_at(x: float, speed: float) -> Rider:
+	var r := Rider.new()
+	r.x = x
+	r.y = ground_y(x)
+	r.speed = speed
+	var m := _slope_behind(x)
+	var inv := 1.0 / sqrt(1.0 + m * m)
+	r.vx = speed * inv
+	r.vy = speed * m * inv
+	return r
+
+
+## One tick of riding. `target` is the pace Spirit is being asked for.
+func step(r: Rider, dt: float, target: float) -> void:
+	r.impact = 0.0
+	if r.grounded:
+		var m := _slope_behind(r.x)
+		var inv := 1.0 / sqrt(1.0 + m * m)
+		# Along the ground there are two forces: her own legs, and gravity's share of the slope.
+		var legs := clampf((target - r.speed) * DRIVE_GAIN, -BRAKE_MAX, PUSH_MAX)
+		if target <= 0.0:
+			legs = -900.0
+		r.speed += (GRAVITY * m * inv + legs) * dt
+		if target > 0.0:
+			r.speed = clampf(r.speed, MIN_SPEED, MAX_SPEED)
+		else:
+			r.speed = maxf(r.speed, 0.0)
+		r.vx = r.speed * inv
+		r.vy = r.speed * m * inv
+		var nx := r.x + r.vx * dt
+		var free_y := r.y + r.vy * dt + 0.5 * GRAVITY * dt * dt  # where she would be with nothing under her
+		var gy := ground_y(nx)
+		r.x = nx
+		if free_y < gy - 0.05:
+			# The ground has dropped away faster than she falls, so she is in the air.
+			r.grounded = false
+			r.y = free_y
+			r.vy += GRAVITY * dt
+		else:
+			r.y = gy
+	else:
+		r.vy += GRAVITY * dt
+		r.x += r.vx * dt
+		r.y += r.vy * dt
+		var gy := ground_y(r.x)
+		if r.y >= gy:
+			# Landing. She keeps the part of her speed that points along the ground.
+			var m := slope(r.x)
+			var inv := 1.0 / sqrt(1.0 + m * m)
+			r.impact = maxf((r.vy - r.vx * m) * inv, 1.0)
+			r.speed = maxf((r.vx + r.vy * m) * inv, MIN_SPEED * 0.6)
+			r.y = gy
+			r.grounded = true
+			r.vx = r.speed * inv
+			r.vy = r.speed * m * inv
+
+
+## Spirit pushes off. A jump taken going uphill carries higher; one taken going downhill, lower.
+func jump(r: Rider) -> void:
+	var rising := r.vy if r.grounded else 0.0
+	r.vy = clampf(rising + JUMP, JUMP * 1.25, JUMP * 0.85)
+	r.grounded = false
+
+
+## Works out, in advance, the path through the air from a given spot and speed.
+## The path is empty if Spirit never leaves the ground.
+func trace(x: float, speed: float, with_jump: bool, target: float) -> PackedVector2Array:
+	var r := _rider_at(x, speed)
+	if with_jump:
+		jump(r)
+	var path := PackedVector2Array()
+	for i in 220:
+		step(r, TICK, target)
+		if not r.grounded:
+			path.append(Vector2(r.x, r.y))
+		elif path.size() > 0:
+			path.append(Vector2(r.x, r.y))
+			break
+		elif i > 40:
+			break
+	return path
+
+
+## How high (as a y position) a path is when it crosses x, or INF if it never gets there.
+func path_y_at(path: PackedVector2Array, x: float) -> float:
+	for i in range(1, path.size()):
+		if path[i].x >= x and path[i - 1].x <= x:
+			var k := inverse_lerp(path[i - 1].x, path[i].x, x)
+			return lerpf(path[i - 1].y, path[i].y, k)
+	return INF
+
+
+func nominal_speed(x: float) -> float:
+	if nominal.is_empty():
+		return BASE_SPEED
+	return nominal[clampi(int((x - START_X) / 40.0), 0, nominal.size() - 1)]
 
 
 # --- Building a course -------------------------------------------------------
@@ -82,58 +253,284 @@ func pace(axis: float) -> float:
 func _build() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7000 + course
-	var kinds := ["fence", "ring_low", "bale", "ring_mid", "log", "fence_ring", "arc"]
+	roughness = minf(0.7 + 0.1 * (course - 1), 1.15)
+	hills = [
+		[90.0, TAU / rng.randf_range(1500.0, 1900.0), rng.randf() * TAU],
+		[45.0, TAU / rng.randf_range(800.0, 1000.0), rng.randf() * TAU],
+		[10.0, TAU / rng.randf_range(400.0, 500.0), rng.randf() * TAU],
+	]
+	# First decide what goes where, because ledges change the shape of the ground.
+	var kinds := ["fence", "ring_low", "bale", "ring_mid", "log", "fence_ring", "arc", "ledge"]
 	if course >= 2:
-		kinds.append_array(["ring_high", "arc", "fence_ring"])
+		kinds.append_array(["ring_high", "arc", "fence_ring", "ledge"])
+	var plan: Array = []
 	var x := START_X + 950.0
 	var previous := ""
-	while x < START_X + LENGTH - 800.0:
+	while x < START_X + LENGTH - 1100.0:
 		var kind: String = kinds[rng.randi() % kinds.size()]
 		if kind == previous:
 			kind = kinds[rng.randi() % kinds.size()]
+		if kind == "ledge" and (previous == "ledge" or x > START_X + LENGTH - 2600.0):
+			kind = "bale"
 		previous = kind
-		match kind:
-			"fence", "bale", "log":
-				_add_obstacle(kind, x)
-			"ring_low":
-				_add_ring(x, -RIDER_HEIGHT - 4.0)
-			"ring_mid":
-				_add_ring(x, -RIDER_HEIGHT - 105.0)
-			"ring_high":
-				_add_ring(x, -RIDER_HEIGHT - 150.0)
-			"fence_ring":
-				_add_ring(x, -RIDER_HEIGHT - 120.0)
-				_add_obstacle("fence", x)
-			"arc":
-				# Three rings along the path of one jump.
-				_add_ring(x, -RIDER_HEIGHT - 90.0)
-				_add_ring(x + 120.0, -RIDER_HEIGHT - 150.0)
-				_add_ring(x + 240.0, -RIDER_HEIGHT - 90.0)
-				x += 240.0
+		plan.append([kind, x])
+		if kind == "ledge":
+			ledges.append([x, 560.0, 170.0, 95.0 + 10.0 * minf(course - 1, 3.0)])
+			x += 730.0 + 320.0
+		elif kind == "arc":
+			x += 300.0
 		x += rng.randf_range(560.0, 780.0) - 30.0 * minf(course - 1, 4.0)
 	finish_x = START_X + LENGTH - 300.0
-	var arch := _sprite("finish", finish_x, 0.0)
+
+	_build_ground()
+	_measure_nominal()
+	shadow = Sprite2D.new()
+	shadow.texture = game.spark
+	shadow.modulate = Color(0.0, 0.0, 0.0, 0.6)
+	add_child(shadow)
+
+	for entry in plan:
+		var kind: String = entry[0]
+		var at: float = entry[1]
+		match kind:
+			"fence", "bale", "log":
+				_add_obstacle(kind, _gentle_spot(at))
+			"ring_low":
+				_add_ring(at, ground_y(at) - RIDER_HEIGHT - 4.0)
+			"ring_mid":
+				_add_jump_ring(at, 105.0)
+			"ring_high":
+				_add_jump_ring(at, 145.0)
+			"fence_ring":
+				at = _gentle_spot(at)
+				_add_ring(at, _apex_over(at) + 40.0 - RIDER_HEIGHT)
+				_add_obstacle("fence", at)
+			"arc":
+				# Three rings along the path of one jump.
+				var path := trace(at, nominal_speed(at), true, pace(0.0))
+				for share in [0.25, 0.5, 0.75]:
+					var p: Vector2 = path[int(path.size() * share)]
+					_add_ring(p.x, p.y - RIDER_HEIGHT)
+			"ledge":
+				# A ring hanging in the air where Spirit flies off the edge.
+				var lip: float = at + 560.0
+				var path := trace(lip - 40.0, nominal_speed(lip - 40.0), false, pace(0.0))
+				if path.size() >= 8:
+					var p: Vector2 = path[int(path.size() * 0.45)]
+					_add_ring(p.x, p.y - RIDER_HEIGHT)
+	var arch := _sprite("finish", finish_x)
 	arch.z_index = 0
 
 
-func _sprite(art: String, x: float, bottom: float) -> Sprite2D:
+## The ground is one long strip of the grass picture, bent to follow the hills, with soil
+## under it, plus the solid shape that knocked-over things land on.
+func _build_ground() -> void:
+	var x0 := START_X - 1200.0
+	var x1 := START_X + LENGTH + 1800.0
+	var tex: Texture2D = game.ground_art
+	var k: float = game.GROUND_ART_HEIGHT / tex.get_height()
+	var tile := tex.get_width() * k
+	var grass := [PackedVector2Array(), PackedVector2Array(), PackedInt32Array()]
+	var soil := [PackedVector2Array(), PackedVector2Array(), PackedInt32Array()]
+	var deep: float = game.GROUND_Y + 800.0
+	var n := 0
+	var x := x0
+	while x <= x1:
+		var top: float = ground_y(x) - game.GRASS_RISE
+		grass[0].append(Vector2(x, top))
+		grass[0].append(Vector2(x, top + game.GROUND_ART_HEIGHT))
+		grass[1].append(Vector2((x - x0) / tile, 0.004))
+		grass[1].append(Vector2((x - x0) / tile, 0.996))
+		soil[0].append(Vector2(x, top + 124.0))
+		soil[0].append(Vector2(x, deep))
+		soil[1].append(Vector2.ZERO)
+		soil[1].append(Vector2.ZERO)
+		if n > 0:
+			var i := n * 2
+			for strip in [grass, soil]:
+				strip[2].append_array([i - 2, i, i - 1, i - 1, i, i + 1])
+		n += 1
+		x += 24.0
+	var under := _strip(soil, null)
+	under.modulate = Color(0.33, 0.17, 0.1)
+	_strip(grass, tex)
+
+	var body := StaticBody2D.new()
+	body.collision_layer = 1
+	body.collision_mask = 0
+	var floor_y: float = game.GROUND_Y + 80.0
+	x = x0
+	while x < x1:
+		var shape := ConvexPolygonShape2D.new()
+		shape.points = PackedVector2Array([
+			Vector2(x, ground_y(x)), Vector2(x + 48.0, ground_y(x + 48.0)),
+			Vector2(x + 48.0, floor_y), Vector2(x, floor_y),
+		])
+		var col := CollisionShape2D.new()
+		col.shape = shape
+		body.add_child(col)
+		x += 48.0
+	add_child(body)
+
+
+func _strip(data: Array, tex: Texture2D) -> MeshInstance2D:
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = data[0]
+	arrays[Mesh.ARRAY_TEX_UV] = data[1]
+	arrays[Mesh.ARRAY_INDEX] = data[2]
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	var node := MeshInstance2D.new()
+	node.mesh = mesh
+	node.texture = tex
+	node.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	add_child(node)
+	return node
+
+
+## Rides the whole course once at an easy pace, without jumping, to learn how fast
+## Spirit is going at each point. Rings are hung where that ride can reach them.
+func _measure_nominal() -> void:
+	nominal.resize(int((LENGTH + 600.0) / 40.0) + 1)
+	nominal.fill(BASE_SPEED)
+	var r := _rider_at(START_X, 0.0)
+	var target := pace(0.0)
+	for i in 6000:
+		step(r, TICK, target)
+		var slot := int((r.x - START_X) / 40.0)
+		if slot >= nominal.size():
+			break
+		nominal[slot] = r.speed
+
+
+## The nearest spot at or after x where the ground is close to level.
+func _gentle_spot(x: float) -> float:
+	var best := x
+	var least := INF
+	for i in 17:
+		var at := x + i * 20.0
+		var steep := maxf(absf(slope(at)), absf((ground_y(at + 50.0) - ground_y(at - 50.0)) / 100.0))
+		if steep < least:
+			least = steep
+			best = at
+		if steep < 0.08:
+			break
+	return best
+
+
+## The top of the jump that peaks over x, as a y position for Spirit's hooves.
+func _apex_over(x: float) -> float:
+	var best := ground_y(x) - 150.0
+	var nearest := INF
+	for d in range(100, 340, 10):
+		var path := trace(x - d, nominal_speed(x - d), true, pace(0.0))
+		var top := Vector2(0.0, INF)
+		for p in path:
+			if p.y < top.y:
+				top = p
+		if absf(top.x - x) < nearest:
+			nearest = absf(top.x - x)
+			best = top.y
+	return best
+
+
+## A ring that needs a jump. It is lowered until a jump from somewhere really reaches it.
+func _add_jump_ring(x: float, height: float) -> void:
+	var h := height
+	while h > 50.0:
+		var y := ground_y(x) - RIDER_HEIGHT - h
+		for d in range(60, 460, 20):
+			var path := trace(x - d, nominal_speed(x - d), true, pace(0.0))
+			if absf(path_y_at(path, x) - RIDER_HEIGHT - y) <= RING_OPENING * 0.5:
+				_add_ring(x, y)
+				return
+		h -= 15.0
+	_add_ring(x, ground_y(x) - RIDER_HEIGHT - 4.0)
+
+
+func _sprite(art: String, x: float) -> Sprite2D:
 	var sprite := Sprite2D.new()
 	sprite.texture = load("res://art/props/%s.png" % art)
 	sprite.scale = Vector2(ART_SCALE, ART_SCALE)
-	var size := sprite.texture.get_size() * ART_SCALE
 	sprite.offset = Vector2(0.0, -sprite.texture.get_size().y / 2.0)  # stands on its bottom edge
-	sprite.position = Vector2(x, game.GROUND_Y + 4.0 + bottom)
+	sprite.position = Vector2(x, ground_y(x) + 4.0)
 	add_child(sprite)
 	return sprite
 
 
-func _add_obstacle(kind: String, x: float) -> void:
-	var sprite := _sprite(kind, x, 0.0)
+## A piece of a picture, placed so the whole picture would stand on the ground at (0, 0).
+func _cut(tex: Texture2D, region: Rect2) -> Sprite2D:
+	var sprite := Sprite2D.new()
+	sprite.texture = tex
+	sprite.region_enabled = true
+	sprite.region_rect = region
+	sprite.scale = Vector2(ART_SCALE, ART_SCALE)
+	sprite.position = _art_point(tex, region.get_center())
 	sprite.z_index = 2  # in front of Spirit
-	items.append({ "kind": kind, "x": x, "node": sprite, "done": false })
+	return sprite
 
 
-func _add_ring(x: float, height: float) -> void:
+func _art_point(tex: Texture2D, p: Vector2) -> Vector2:
+	var size := tex.get_size()
+	return Vector2((p.x - size.x / 2.0) * ART_SCALE, (p.y - size.y) * ART_SCALE + 4.0)
+
+
+func _add_obstacle(kind: String, x: float) -> void:
+	var root := Node2D.new()
+	root.position = Vector2(x, ground_y(x))
+	root.rotation = atan(slope(x))
+	add_child(root)
+	var tex: Texture2D = load("res://art/props/%s.png" % kind)
+	var index := items.size()
+	var pieces: Array = []
+	match kind:
+		"fence":
+			# The posts and flower box stand still. Each rail can be knocked off.
+			for region in FENCE_STILL:
+				root.add_child(_cut(tex, region))
+			for region in FENCE_RAILS:
+				var shape := RectangleShape2D.new()
+				shape.size = Vector2(74.0, 6.0)
+				pieces.append(_piece(root, index, tex, region, region.get_center(), shape, 1.0, 0.35))
+		"bale":
+			var shape := CircleShape2D.new()
+			shape.radius = 27.0
+			var bale := _piece(root, index, tex, Rect2(Vector2.ZERO, tex.get_size()), Vector2(74.0, 70.0), shape, 2.5, 0.3)
+			bale.angular_damp = 0.9
+			pieces.append(bale)
+		"log":
+			var shape := RectangleShape2D.new()
+			shape.size = Vector2(92.0, 22.0)
+			pieces.append(_piece(root, index, tex, Rect2(Vector2.ZERO, tex.get_size()), Vector2(118.0, 60.0), shape, 4.0, 0.2))
+	items.append({ "kind": kind, "x": x, "node": root, "pieces": pieces, "done": false, "hit": false })
+
+
+## A rigid body that waits, perfectly still, until Spirit touches it.
+func _piece(root: Node2D, index: int, tex: Texture2D, region: Rect2, centre: Vector2, shape: Shape2D, weight: float, bounce: float) -> RigidBody2D:
+	var body := RigidBody2D.new()
+	body.position = _art_point(tex, centre)
+	body.collision_layer = PIECES
+	body.collision_mask = 1 | PIECES
+	body.mass = weight
+	body.freeze_mode = RigidBody2D.FREEZE_MODE_KINEMATIC
+	body.freeze = true
+	var material := PhysicsMaterial.new()
+	material.friction = 0.7
+	material.bounce = bounce
+	body.physics_material_override = material
+	var col := CollisionShape2D.new()
+	col.shape = shape
+	body.add_child(col)
+	var sprite := _cut(tex, region)
+	sprite.position = (region.get_center() - centre) * ART_SCALE
+	body.add_child(sprite)
+	body.set_meta("item", index)
+	root.add_child(body)
+	return body
+
+
+func _add_ring(x: float, y: float) -> void:
 	# The ring is drawn as two halves, one behind Spirit and one in front,
 	# so she really passes through it.
 	var tex: Texture2D = load("res://art/props/ring.png")
@@ -145,12 +542,12 @@ func _add_ring(x: float, height: float) -> void:
 		half.region_enabled = true
 		half.region_rect = Rect2(size.x / 2.0 * i, 0.0, size.x / 2.0, size.y)
 		half.scale = Vector2(ART_SCALE, ART_SCALE)
-		half.position = Vector2(x + (i - 0.5) * size.x / 2.0 * ART_SCALE, game.GROUND_Y + height)
+		half.position = Vector2(x + (i - 0.5) * size.x / 2.0 * ART_SCALE, y)
 		half.z_index = 0 if i == 0 else 2
 		add_child(half)
 		halves.append(half)
 	rings_total += 1
-	items.append({ "kind": "ring", "x": x, "y": game.GROUND_Y + height, "nodes": halves, "done": false })
+	items.append({ "kind": "ring", "x": x, "y": y, "nodes": halves, "done": false })
 
 
 # --- Riding ------------------------------------------------------------------
@@ -158,36 +555,113 @@ func _add_ring(x: float, height: float) -> void:
 func _physics_process(delta: float) -> void:
 	if not active:
 		return
-	var p = game.player
-	stumble_time = maxf(stumble_time - delta, 0.0)
+	_place_shadow()
+	if rider.impact > 0.0:
+		_dust(Vector2(rider.x, rider.y), clampf(rider.impact / 500.0, 0.4, 1.4))
 	if finished:
 		finish_time += delta
 		return
 	run_time += delta
-	var px: float = p.position.x
-	var hooves: float = game.GROUND_Y - p.position.y  # how high Spirit is off the ground
+	if not rider.grounded:
+		air_time += delta
+	var px := rider.x
 	for item in items:
 		if item["done"]:
 			continue
+		var ix: float = item["x"]
 		if item["kind"] == "ring":
-			if last_x < item["x"] and px >= item["x"]:
+			if last_x < ix and px >= ix:
 				item["done"] = true
-				var rider_y: float = p.position.y - RIDER_HEIGHT
-				if absf(rider_y - float(item["y"])) <= RING_OPENING:
+				if absf(rider.y - RIDER_HEIGHT - float(item["y"])) <= RING_OPENING:
 					_collect(item)
-		else:
-			var spec: Dictionary = OBSTACLES[item["kind"]]
-			var reach: float = float(spec["half"]) + HORSE_HALF
-			if absf(px - float(item["x"])) < reach:
-				if hooves < float(spec["clear"]):
-					item["done"] = true
-					_stumble(item)
-			elif px > float(item["x"]) + reach:
-				item["done"] = true
-				jumps_clean += 1
+		elif px > ix + 130.0:
+			item["done"] = true
+			jumps_clean += 1
+	# Things left far behind are tidied away.
+	for item in items:
+		if item.has("node") and item["node"] != null and px > float(item["x"]) + 1700.0:
+			item["node"].queue_free()
+			item["node"] = null
 	last_x = px
 	if px >= finish_x:
 		_finish()
+
+
+## Called when Spirit's legs touch something that can be knocked over.
+func on_touch(body: Node) -> void:
+	if not active or finished or not body.has_meta("item"):
+		return
+	var item: Dictionary = items[int(body.get_meta("item"))]
+	if not item["hit"]:
+		item["hit"] = true
+		item["done"] = true
+		_stumble()
+	# The physics engine is in the middle of its own step right now, so the shove waits a moment.
+	_knock.call_deferred(body, Vector2(rider.vx, rider.vy))
+
+
+## Lets a piece go and shoves it with Spirit's own speed. From here on it is on its own:
+## gravity, bounces, rolling and bumping into its neighbours are all the physics engine's work.
+func _knock(body: RigidBody2D, hit: Vector2) -> void:
+	if not is_instance_valid(body) or not body.freeze:
+		return
+	body.freeze = false
+	var shove := hit * randf_range(0.8, 1.0) + Vector2(0.0, -randf_range(140.0, 260.0))
+	# Pushing a little off-centre is what sets it spinning.
+	body.apply_impulse(shove * body.mass, Vector2(randf_range(-14.0, 14.0), randf_range(2.0, 10.0)))
+	if body.get_child(0).shape is CircleShape2D:
+		body.angular_velocity = hit.x / 27.0 * 0.7  # a bale starts off rolling
+	_dust(body.global_position, 0.8)
+
+
+func _stumble() -> void:
+	stumbles += 1
+	# Spirit gives up part of her speed to whatever she hit, then has to build it back.
+	rider.speed *= KNOCK_KEEPS
+	rider.vx *= KNOCK_KEEPS + 0.15
+	var rig = game.horse.rig
+	rig.modulate = Color(1.7, 0.75, 0.75)
+	rig.create_tween().tween_property(rig, "modulate", Color.WHITE, 0.45)
+
+
+func _place_shadow() -> void:
+	if shadow == null:
+		return
+	var gy := ground_y(rider.x)
+	var lift := clampf((gy - rider.y) / 240.0, 0.0, 1.0)
+	shadow.position = Vector2(rider.x, gy + 3.0)
+	shadow.rotation = atan(slope(rider.x))
+	shadow.scale = Vector2(3.4, 0.62) * lerpf(1.0, 0.5, lift)
+	shadow.modulate.a = lerpf(0.6, 0.25, lift)
+
+
+func _burst(at: Vector2, amount: int, life: float) -> CPUParticles2D:
+	var burst := CPUParticles2D.new()
+	burst.texture = game.spark
+	burst.position = at
+	burst.one_shot = true
+	burst.explosiveness = 1.0
+	burst.amount = amount
+	burst.lifetime = life
+	burst.scale_amount_curve = game.shrink
+	burst.z_index = 3
+	burst.emitting = true
+	add_child(burst)
+	get_tree().create_timer(life + 0.3).timeout.connect(burst.queue_free)
+	return burst
+
+
+func _dust(at: Vector2, strength: float) -> void:
+	var puff := _burst(at, int(10.0 * strength) + 4, 0.5)
+	puff.direction = Vector2(0.0, -1.0)
+	puff.spread = 75.0
+	puff.initial_velocity_min = 40.0 * strength
+	puff.initial_velocity_max = 150.0 * strength
+	puff.gravity = Vector2(0.0, 160.0)
+	puff.scale_amount_min = 0.5
+	puff.scale_amount_max = 1.1
+	puff.color = Color(0.86, 0.78, 0.6, 0.55)
+	puff.z_index = 1
 
 
 func _collect(item: Dictionary) -> void:
@@ -197,39 +671,15 @@ func _collect(item: Dictionary) -> void:
 		tween.set_parallel(true)
 		tween.tween_property(half, "modulate", Color(2.0, 2.0, 1.4, 0.0), 0.3)
 		tween.tween_property(half, "position:y", half.position.y - 30.0, 0.3)
-	var sparkle := CPUParticles2D.new()
-	sparkle.texture = game.spark
+	var sparkle := _burst(Vector2(float(item["x"]), float(item["y"])), 22, 0.55)
 	sparkle.material = game.additive
-	sparkle.position = Vector2(float(item["x"]), float(item["y"]))
-	sparkle.one_shot = true
-	sparkle.explosiveness = 1.0
-	sparkle.amount = 22
-	sparkle.lifetime = 0.55
 	sparkle.spread = 180.0
 	sparkle.initial_velocity_min = 80.0
 	sparkle.initial_velocity_max = 240.0
 	sparkle.gravity = Vector2(0.0, 220.0)
 	sparkle.scale_amount_min = 0.3
 	sparkle.scale_amount_max = 0.7
-	sparkle.scale_amount_curve = game.shrink
 	sparkle.color = Color(1.0, 0.85, 0.3)
-	sparkle.z_index = 3
-	sparkle.emitting = true
-	add_child(sparkle)
-
-
-func _stumble(item: Dictionary) -> void:
-	stumbles += 1
-	stumble_time = 0.55
-	# The obstacle tips over, and Spirit flashes to show the bump.
-	var node: Sprite2D = item["node"]
-	var tween := node.create_tween()
-	tween.set_parallel(true)
-	tween.tween_property(node, "rotation", 1.3, 0.35)
-	tween.tween_property(node, "modulate:a", 0.35, 0.5)
-	var rig = game.horse.rig
-	rig.modulate = Color(1.7, 0.75, 0.75)
-	rig.create_tween().tween_property(rig, "modulate", Color.WHITE, 0.45)
 
 
 func _finish() -> void:

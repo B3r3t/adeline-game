@@ -58,6 +58,9 @@ var anim_time := 0.0
 var mounted := false
 var cast_time := 9.0  # seconds since the last fireball, for the casting pose
 var walk_phase := 0.0
+var air := false  # off the ground, on foot or on Spirit
+var pitch := 0.0  # how far Spirit is tipped to match the hill under her
+var hit_area: Area2D = null  # Spirit's legs, for knocking things over on the riding course
 var rig = null
 var min_x := -INF
 var max_x := INF
@@ -76,6 +79,20 @@ func _ready() -> void:
 	rig.set_script(RigScript)
 	add_child(rig)
 	rig.build("res://art/adeline")
+	# Spirit's legs and belly. On the riding course, anything this touches gets knocked.
+	hit_area = Area2D.new()
+	hit_area.collision_layer = 0
+	hit_area.collision_mask = 4
+	hit_area.monitorable = false
+	hit_area.monitoring = false
+	var legs := RectangleShape2D.new()
+	legs.size = Vector2(62.0, 36.0)
+	var legs_col := CollisionShape2D.new()
+	legs_col.shape = legs
+	legs_col.position = Vector2(4.0, -26.0)
+	hit_area.add_child(legs_col)
+	hit_area.body_entered.connect(func(body): game.ride.on_touch(body))
+	add_child(hit_area)
 
 
 func reset(at: Vector2) -> void:
@@ -118,6 +135,13 @@ func _physics_process(delta: float) -> void:
 	invuln = maxf(invuln - delta, 0.0)
 	knock = move_toward(knock, 0.0, 1400.0 * delta)
 
+	if game.mode == "ride" and game.ride.active:
+		_ride(delta)
+		return
+	if hit_area.monitoring:
+		hit_area.monitoring = false
+	pitch = 0.0
+
 	if not is_on_floor():
 		velocity.y += GRAVITY * delta
 		coyote = maxf(coyote - delta, 0.0)
@@ -132,11 +156,6 @@ func _physics_process(delta: float) -> void:
 	var speed := SPEED * (0.6 if is_striking() else 1.0)
 	if mounted:
 		speed = RIDE_SPEED
-	if game.mode == "ride":
-		# On the riding course Spirit gallops by herself. The arrows only change her pace.
-		speed = game.ride.pace(dir)
-		dir = 0.0 if game.ride.finished else 1.0
-		facing = 1
 	velocity.x = move_toward(velocity.x, dir * speed, ACCEL * delta)
 
 	if not locked:
@@ -149,6 +168,53 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	velocity.x = walk
 	position.x = clampf(position.x, min_x, max_x)
+	air = not is_on_floor()
+	if mounted:
+		game.horse.carry(delta)
+	_animate()
+	queue_redraw()
+
+
+## The riding course. Spirit gallops by herself and the course works out how she moves:
+## hills, momentum, flight and landings. Here we only pass on the jump button and the arrows.
+func _ride(delta: float) -> void:
+	var r = game.ride
+	var s = r.rider
+	var locked: bool = game.input_locked()
+	var dir := 0.0 if locked else Input.get_axis("move_left", "move_right")
+	facing = 1
+	if not locked:
+		if Input.is_action_just_pressed("jump"):
+			jump_buffer = 0.12
+		else:
+			jump_buffer = maxf(jump_buffer - delta, 0.0)
+		if jump_buffer > 0.0 and (s.grounded or coyote > 0.0):
+			r.jump(s)
+			jump_buffer = 0.0
+			coyote = 0.0
+		if Input.is_action_just_released("jump") and s.vy < -260.0:
+			s.vy = -260.0  # letting go early makes a shorter hop
+	r.step(s, delta, r.pace(dir))
+	if s.grounded:
+		coyote = 0.1
+	else:
+		coyote = maxf(coyote - delta, 0.0)
+	if s.x > max_x:
+		s.x = max_x
+		s.speed = 0.0
+		s.vx = 0.0
+	position = Vector2(s.x, s.y)
+	velocity = Vector2(s.vx, s.vy)
+	air = not s.grounded
+	# Spirit tips to match the hill under her, and follows her own flight in the air.
+	var lean: float = atan(r.slope(s.x))
+	if air:
+		lean = clampf(atan2(s.vy, maxf(s.vx, 60.0)) * 0.45, -0.5, 0.5)
+	pitch = lerp_angle(pitch, lean, 1.0 - exp(-12.0 * delta))
+	if not hit_area.monitoring:
+		hit_area.monitoring = true
+	hit_area.rotation = pitch
+	game.horse.carry(delta)
 	_animate()
 	queue_redraw()
 
@@ -253,7 +319,8 @@ func _animate() -> void:
 		rig.root_angle = -PI / 2.0
 		offset = Vector2(-10.0, -rig.rest_pos("torso").y - 12.0)
 	elif mounted:
-		var pace := clampf(absf(velocity.x) / RIDE_SPEED, 0.0, 1.0)
+		var pace := clampf(velocity.length() / RIDE_SPEED, 0.0, 1.0)
+		rig.root_angle = game.horse.rig.root_angle
 		pose["leg_near_upper"] = -55.0
 		pose["leg_near_lower"] = 60.0
 		pose["leg_far_upper"] = -55.0
@@ -264,7 +331,7 @@ func _animate() -> void:
 		pose["cloak_back"] = 4.0 + pace * 24.0 + sway * 3.0
 		pose["ponytail"] = pace * 20.0 + sway * 3.0
 		offset = game.horse.seat() - rig.rest_pos("torso")
-	elif not is_on_floor():
+	elif air:
 		var falling := velocity.y > 0.0
 		pose["leg_near_upper"] = -20.0 if falling else -40.0
 		pose["leg_near_lower"] = 22.0 if falling else 54.0

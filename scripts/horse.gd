@@ -65,13 +65,11 @@ func set_mounted(on: bool) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if state == "mounted":
+		return  # Adeline moves Spirit while she rides, so the two never drift apart
 	clock += delta
 	var p = game.player
 	match state:
-		"mounted":
-			position = p.position
-			facing = p.facing
-			speed = absf(p.velocity.x)
 		"coming":
 			var side := 1.0 if p.position.x >= position.x else -1.0
 			if _move_to(p.position.x - 80.0 * side, GALLOP, delta):
@@ -82,6 +80,18 @@ func _physics_process(delta: float) -> void:
 				state = "idle"
 		_:
 			speed = move_toward(speed, 0.0, 2400.0 * delta)
+	stride += speed * delta * 0.035
+	_animate()
+	queue_redraw()
+
+
+## Called by Adeline each tick while she rides, right after she has moved.
+func carry(delta: float) -> void:
+	clock += delta
+	var p = game.player
+	position = p.position
+	facing = p.facing
+	speed = p.velocity.length()
 	stride += speed * delta * 0.035
 	_animate()
 	queue_redraw()
@@ -111,7 +121,7 @@ func _animate() -> void:
 	_leg(pose, "leg_hind_near", stride + 2.1, pace, false)
 	_leg(pose, "leg_hind_far", stride + 2.8, pace, false)
 	var bounce := -absf(sin(stride)) * 6.0 * pace
-	if state == "mounted" and not game.player.is_on_floor():
+	if state == "mounted" and game.player.air:
 		# In the air: front legs tuck going up and reach out coming down.
 		var rising: bool = game.player.velocity.y < 0.0
 		pose["body"] = -9.0 if rising else 7.0
@@ -123,11 +133,16 @@ func _animate() -> void:
 		pose["tail"] = 34.0
 		bounce = 0.0
 	rig.pose = pose
-	rig.root_offset = Vector2(0.0, bounce)
+	# On a hill Spirit tips to match it, turning about her hooves so all four stay on the ground.
+	var tilt: float = game.player.pitch * facing if state == "mounted" else 0.0
+	var joint: Vector2 = rig.rest_pos("body")
+	rig.root_angle = tilt
+	rig.root_offset = Vector2(0.0, bounce) + joint.rotated(tilt) - joint
 	rig.apply()
 	# Adeline's near leg, drawn over Spirit's side while she rides.
 	rider.visible = state == "mounted"
 	rider.root_offset = seat() - rider.rest_pos("torso")
+	rider.root_angle = tilt
 	rider.pose = { "leg_near_upper": -52.0, "leg_near_lower": 62.0 }
 	rider.apply()
 
@@ -145,7 +160,7 @@ func _leg(pose: Dictionary, part: String, phase: float, pace: float, front: bool
 
 ## Where a rider sits, relative to Spirit's feet and facing right.
 func seat() -> Vector2:
-	return rig.rest_pos("body") + rig.root_offset + SEAT
+	return rig.rest_pos("body") + rig.root_offset + SEAT.rotated(rig.root_angle)
 
 
 func _draw() -> void:

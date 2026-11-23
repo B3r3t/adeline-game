@@ -36,12 +36,25 @@ player does the jumping.
 
 - Jump fences, hay bales and logs. Hold Jump for a higher leap. The arrows slow Spirit or speed her up.
 - Ride or jump through golden rings. Some sit along the arc of a single jump.
-- Nothing can be lost. Knocking an obstacle only slows Spirit for a moment.
+- Nothing can be lost. Knocking an obstacle costs Spirit some of her speed.
 - Each course ends with one to three stars, from rings collected and bumps taken. The best
   stars for each course are saved.
-- "Next course" gives a new layout that is a little faster. A course number always gives the
-  same layout, so it can be practised.
-- `scripts/ride.gd` holds the course: speeds, ring heights and obstacle sizes are at the top.
+- "Next course" gives a new layout that is a little faster and hillier. A course number always
+  gives the same layout, so it can be practised.
+
+The course runs on real physics:
+
+- The ground rolls. Gravity slows Spirit on the way up a hill and speeds her up on the way
+  down, and her own legs work to bring her back to the pace she is asked for.
+- Where the ground drops away faster than she falls, she flies. Ledges send her into the air
+  with no button pressed, and a ring hangs on that flight.
+- A jump taken going uphill carries higher, and one taken downhill carries lower. On landing
+  she keeps the part of her speed that points along the slope.
+- Jump rails, hay bales and logs are rigid bodies. Spirit's legs knock them away at her own
+  speed, and from there the physics engine does the rest: rails spin and bounce, bales roll.
+- Rings that need a jump are hung by working out real jumps in advance, so every ring can be
+  reached at an easy pace.
+- `scripts/ride.gd` holds all of it. The forces and speeds are at the top.
 
 ## Art
 
