@@ -15,6 +15,7 @@ Step 3: all of Mission 1, "Goblin Trouble", in real art.
 - Five goblins in three camps. The first only swings, the second only charges, the third camp mixes both with one goblin attacking at a time.
 - Losing a fight restarts only that fight, with full health.
 - Returning to Merlin awards the Magic Shield, then opens practice fights of one to three goblins.
+- Spirit wears a leather saddle on a purple blanket, and reins that run from her bit to Adeline's hands while she rides and loop back to the saddle when she does not.
 - Spirit, Adeline's horse (dark brown, black mane and tail), waits in the stable. Tap Call and Spirit comes to her, tap Ride to gallop across the island, and Spirit stays back from goblin fights.
 
 Controls
