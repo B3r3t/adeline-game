@@ -9,11 +9,13 @@ const HudScript := preload("res://scripts/hud.gd")
 const TouchScript := preload("res://scripts/touch_controls.gd")
 const DialogScript := preload("res://scripts/dialog.gd")
 const HorseScript := preload("res://scripts/horse.gd")
+const RideScript := preload("res://scripts/ride.gd")
 
 const GROUND_Y := 560.0
 const LEVEL_LEFT := 0.0
 const LEVEL_RIGHT := 5400.0
 const CAMERA_ZOOM := 1.4  # bigger characters are easier to read on an 8 inch screen
+const RIDE_ZOOM := 1.15  # the riding course shows more of what is coming
 
 const HOUSE_X := 40.0  # left edge of the farmhouse
 const STABLE_X := 549.0  # where Spirit waits, inside the stable
@@ -55,6 +57,8 @@ const ENCOUNTERS := [
 
 var player = null
 var horse = null
+var ride = null  # the riding course
+var zoom := CAMERA_ZOOM
 var merlin: Sprite2D
 var boat: Sprite2D
 var goblins: Array = []
@@ -76,7 +80,7 @@ var controls = null
 var dialog = null
 var font: Font
 
-var mode := "title"  # title or play
+var mode := "title"  # title, play (the adventure) or ride (the riding course)
 var data := {}  # saved progress
 var encounter := {}  # the fight in progress, or empty
 var encounter_kind := ""  # mission or practice
@@ -100,6 +104,11 @@ func _ready() -> void:
 	_build_ground()
 	_build_scenery()
 
+	ride = Node2D.new()
+	ride.set_script(RideScript)
+	ride.game = self
+	add_child(ride)
+
 	projectiles = Node2D.new()
 	add_child(projectiles)
 
@@ -114,8 +123,6 @@ func _ready() -> void:
 	add_child(player)
 
 	camera = Camera2D.new()
-	camera.limit_left = int(LEVEL_LEFT)
-	camera.limit_right = int(LEVEL_RIGHT)
 	camera.zoom = Vector2(CAMERA_ZOOM, CAMERA_ZOOM)
 	# The camera, hills and characters all move on the same clock (the physics tick) and are
 	# smoothed between ticks by the engine. Mixing clocks is what makes scrolling judder.
@@ -213,7 +220,8 @@ func _add_strip(art: String, world_height: float, bottom_y: float, depth: int) -
 
 
 func _build_ground() -> void:
-	_add_wall(Rect2(LEVEL_LEFT - 400.0, GROUND_Y, LEVEL_RIGHT - LEVEL_LEFT + 800.0, 400.0))
+	# The floor runs under the island and on under the riding course.
+	_add_wall(Rect2(LEVEL_LEFT - 400.0, GROUND_Y, 8000.0 + 14000.0 + 2000.0, 400.0))
 	_add_wall(Rect2(LEVEL_LEFT - 200.0, GROUND_Y - 1200.0, 200.0, 1200.0))
 	_add_wall(Rect2(LEVEL_RIGHT, GROUND_Y - 1200.0, 200.0, 1200.0))
 
@@ -256,7 +264,7 @@ func _add_wall(rect: Rect2) -> void:
 # --- Saved progress ---------------------------------------------------------
 
 func _default_data() -> Dictionary:
-	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1 }
+	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {} }
 
 
 func has_save() -> bool:
@@ -374,6 +382,9 @@ func _start(new_game: bool) -> void:
 
 func _place_player() -> void:
 	_clear_goblins()
+	ride.clear()
+	zoom = CAMERA_ZOOM
+	camera.zoom = Vector2(zoom, zoom)
 	encounter = {}
 	encounter_kind = ""
 	defeated = false
@@ -398,7 +409,7 @@ func _update_limits() -> void:
 
 
 func input_locked() -> bool:
-	return mode != "play" or dialog.active or defeated
+	return mode == "title" or dialog.active or defeated or (mode == "ride" and ride.finished)
 
 
 func toast(text: String) -> void:
@@ -525,7 +536,7 @@ func _check_triggers() -> void:
 
 func _update_context() -> void:
 	context_action = ""
-	if dialog.active or not encounter.is_empty():
+	if mode != "play" or dialog.active or not encounter.is_empty():
 		return
 	var px: float = player.position.x
 	if absf(px - MERLIN_X) <= TALK_RANGE:
@@ -687,9 +698,68 @@ func hint() -> String:
 
 # --- Loop -------------------------------------------------------------------
 
+# Where the on-screen buttons that are not thumb controls sit.
+func adventure_rect() -> Rect2:
+	var s := get_viewport_rect().size
+	return Rect2(s.x / 2.0 - 400.0, s.y * 0.56, 380.0, 110.0)
+
+
+func ride_rect() -> Rect2:
+	var s := get_viewport_rect().size
+	return Rect2(s.x / 2.0 + 20.0, s.y * 0.56, 380.0, 110.0)
+
+
 func new_game_rect() -> Rect2:
 	var s := get_viewport_rect().size
-	return Rect2(s.x / 2.0 - 190.0, s.y * 0.76, 380.0, 64.0)
+	return Rect2(s.x / 2.0 - 400.0, s.y * 0.56 + 124.0, 380.0, 54.0)
+
+
+func menu_rect() -> Rect2:
+	var s := get_viewport_rect().size
+	return Rect2(s.x - 160.0, 52.0, 120.0, 48.0)
+
+
+func again_rect() -> Rect2:
+	var s := get_viewport_rect().size
+	return Rect2(s.x / 2.0 - 330.0, s.y * 0.6, 310.0, 80.0)
+
+
+func next_rect() -> Rect2:
+	var s := get_viewport_rect().size
+	return Rect2(s.x / 2.0 + 20.0, s.y * 0.6, 310.0, 80.0)
+
+
+# --- The riding course -------------------------------------------------------
+
+func start_ride(number: int) -> void:
+	_place_player()
+	mode = "ride"
+	new_game_armed = false
+	data["ride_course"] = number
+	_save()
+	zoom = RIDE_ZOOM
+	camera.zoom = Vector2(zoom, zoom)
+	player.reset(Vector2(ride.START_X, GROUND_Y))
+	player.min_x = ride.START_X - 200.0
+	player.max_x = ride.START_X + ride.LENGTH + 300.0
+	horse.place(ride.START_X)
+	_mount()
+	ride.start(number)
+	_update_camera(0.0, true)
+
+
+func on_ride_finished(number: int, stars: int) -> void:
+	var best: Dictionary = data["ride_stars"]
+	var key := str(number)
+	if stars > int(best.get(key, 0)):
+		best[key] = stars
+	_save()
+
+
+func go_title() -> void:
+	if not dialog.active:
+		mode = "title"
+		_place_player()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -707,13 +777,23 @@ func _unhandled_input(event: InputEvent) -> void:
 	if mode == "title":
 		if clock < 0.5:
 			return
-		if has_save() and has_pos and new_game_rect().has_point(pos):
+		if has_pos and ride_rect().has_point(pos):
+			start_ride(int(data["ride_course"]))
+		elif has_save() and has_pos and new_game_rect().has_point(pos):
 			if new_game_armed:
 				_start(true)
 			else:
 				new_game_armed = true
-		else:
+		elif not has_pos or adventure_rect().has_point(pos):
 			_start(not has_save())
+	elif has_pos and menu_rect().has_point(pos):
+		go_title()
+	elif mode == "ride":
+		if ride.finished and ride.finish_time >= 0.8 and has_pos:
+			if again_rect().has_point(pos):
+				start_ride(ride.course)
+			elif next_rect().has_point(pos):
+				start_ride(ride.course + 1)
 	elif defeated and defeat_time >= 1.0:
 		_retry()
 
@@ -721,6 +801,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	_update_camera(delta, false)
 	if mode != "play":
+		context_action = ""
 		return
 	if defeated:
 		defeat_time += delta
@@ -737,10 +818,15 @@ func _physics_process(delta: float) -> void:
 
 
 func _camera_target() -> Vector2:
-	var view := get_viewport_rect().size / CAMERA_ZOOM
+	var view := get_viewport_rect().size / zoom
 	# Look a little ahead of Adeline, and keep the ground about three quarters of the way down.
 	var x: float = player.position.x + player.facing * 45.0
-	x = clampf(x, LEVEL_LEFT + view.x / 2.0, LEVEL_RIGHT - view.x / 2.0)
+	if mode == "ride":
+		# On the course Spirit sits toward the left so the next jump is in view early.
+		x = player.position.x + view.x * 0.24
+		x = clampf(x, ride.START_X - 300.0 + view.x / 2.0, ride.START_X + ride.LENGTH + 500.0 - view.x / 2.0)
+	else:
+		x = clampf(x, LEVEL_LEFT + view.x / 2.0, LEVEL_RIGHT - view.x / 2.0)
 	return Vector2(x, GROUND_Y - 0.24 * view.y)
 
 
@@ -785,7 +871,7 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	var g := GROUND_Y
 	var left := LEVEL_LEFT - 600.0
-	var width := LEVEL_RIGHT - LEVEL_LEFT + 1200.0
+	var width: float = ride.START_X + ride.LENGTH + 1800.0  # covers the island and the riding course
 	# Deep soil, then the repeating grass-and-soil strip on top of it.
 	draw_rect(Rect2(left, g + 100.0, width, 700.0), Color(0.33, 0.17, 0.1))
 	var k := GROUND_ART_HEIGHT / ground_art.get_height()

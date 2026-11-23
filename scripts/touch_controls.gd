@@ -42,6 +42,8 @@ func _layout() -> void:
 func _visible(id: String) -> bool:
 	if game == null or game.input_locked():
 		return false
+	if game.mode == "ride":
+		return id == "left" or id == "right" or id == "jump"
 	if id == "shield":
 		return game.has_shield() and not game.player.mounted
 	if id == "interact":

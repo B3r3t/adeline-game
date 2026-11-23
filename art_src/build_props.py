@@ -4,7 +4,8 @@ import os, sys
 from PIL import Image
 
 QUALITY = 2.2  # texture pixels per world pixel, same as the character rigs
-HEIGHTS = {"house": 420.0, "hut": 300.0, "boat": 216.0, "merlin": 160.0, "sign": 130.0, "camp": 150.0}  # world pixels tall
+HEIGHTS = {"house": 420.0, "hut": 300.0, "boat": 216.0, "merlin": 160.0, "sign": 130.0, "camp": 150.0,
+           "fence": 62.0, "bale": 60.0, "log": 40.0, "ring": 170.0, "finish": 250.0}  # world pixels tall
 
 # Long strips that repeat sideways: which rows of the full picture to keep.
 # Each is saved next to its mirror image, so the two ends always match up.

@@ -132,6 +132,11 @@ func _physics_process(delta: float) -> void:
 	var speed := SPEED * (0.6 if is_striking() else 1.0)
 	if mounted:
 		speed = RIDE_SPEED
+	if game.mode == "ride":
+		# On the riding course Spirit gallops by herself. The arrows only change her pace.
+		speed = game.ride.pace(dir)
+		dir = 0.0 if game.ride.finished else 1.0
+		facing = 1
 	velocity.x = move_toward(velocity.x, dir * speed, ACCEL * delta)
 
 	if not locked:
@@ -160,7 +165,7 @@ func _read_actions(delta: float) -> void:
 		coyote = 0.0
 	if Input.is_action_just_released("jump") and velocity.y < -260.0:
 		velocity.y = -260.0  # letting go early makes a shorter hop
-	if Input.is_action_just_pressed("fireball") and fireball_cd <= 0.0:
+	if Input.is_action_just_pressed("fireball") and fireball_cd <= 0.0 and game.mode == "play":
 		_cast_fireball()
 	if mounted:
 		return

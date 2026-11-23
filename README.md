@@ -8,7 +8,8 @@ Play as Adeline: fight goblins with her wand, earn spells, and rescue her parent
 
 Step 3: all of Mission 1, "Goblin Trouble", in real art.
 
-- Title screen with Start, Continue and New game. Progress saves on its own.
+- Title screen with two ways to play: the adventure, and Ride with Spirit. Progress saves on its own.
+- A Home button in the top corner returns to the title screen.
 - The home island as one long strip: house and stable, Merlin's hut, three goblin camps, the river and the boat.
 - Talk to Merlin to pick a mission from his list.
 - Five goblins in three camps. The first only swings, the second only charges, the third camp mixes both with one goblin attacking at a time.
@@ -27,6 +28,20 @@ Combat numbers, all at the top of `scripts/player.gd` and `scripts/goblin.gd`
 - Wand strike: 1 damage, very quick.
 - Fireball: 3 damage, 1.2 seconds between casts. It also works from the saddle.
 - Goblin: 10 health. Each attack warns for 0.9 seconds, then recovers for about a second.
+
+## Ride with Spirit
+
+A second way to play, chosen on the title screen. Spirit gallops a course on her own and the
+player does the jumping.
+
+- Jump fences, hay bales and logs. Hold Jump for a higher leap. The arrows slow Spirit or speed her up.
+- Ride or jump through golden rings. Some sit along the arc of a single jump.
+- Nothing can be lost. Knocking an obstacle only slows Spirit for a moment.
+- Each course ends with one to three stars, from rings collected and bumps taken. The best
+  stars for each course are saved.
+- "Next course" gives a new layout that is a little faster. A course number always gives the
+  same layout, so it can be practised.
+- `scripts/ride.gd` holds the course: speeds, ring heights and obstacle sizes are at the top.
 
 ## Art
 

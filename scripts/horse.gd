@@ -110,8 +110,20 @@ func _animate() -> void:
 	_leg(pose, "leg_front_far", stride + 0.7, pace, true)
 	_leg(pose, "leg_hind_near", stride + 2.1, pace, false)
 	_leg(pose, "leg_hind_far", stride + 2.8, pace, false)
+	var bounce := -absf(sin(stride)) * 6.0 * pace
+	if state == "mounted" and not game.player.is_on_floor():
+		# In the air: front legs tuck going up and reach out coming down.
+		var rising: bool = game.player.velocity.y < 0.0
+		pose["body"] = -9.0 if rising else 7.0
+		for side in ["near", "far"]:
+			pose["leg_front_%s_upper" % side] = -52.0 if rising else -34.0
+			pose["leg_front_%s_lower" % side] = 84.0 if rising else 22.0
+			pose["leg_hind_%s_upper" % side] = 34.0 if rising else 16.0
+			pose["leg_hind_%s_lower" % side] = 12.0 if rising else -42.0
+		pose["tail"] = 34.0
+		bounce = 0.0
 	rig.pose = pose
-	rig.root_offset = Vector2(0.0, -absf(sin(stride)) * 6.0 * pace)
+	rig.root_offset = Vector2(0.0, bounce)
 	rig.apply()
 	# Adeline's near leg, drawn over Spirit's side while she rides.
 	rider.visible = state == "mounted"
