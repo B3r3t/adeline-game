@@ -1,6 +1,6 @@
 """Builds every sound in the game into ../audio, and writes audio/manifest.json.
 
-Usage: python3 -I build_audio.py <folder of recorded voice mp3s> ../audio
+Usage: python3 -I build_audio.py voice ../audio
 
 Two kinds of sound go in:
   * Recorded voices (Merlin's lines, Adeline's shouts, goblin grunts, Spirit's whinny).
@@ -212,6 +212,33 @@ def fanfare():
     return place(parts, 1.6)
 
 
+def munch():
+    """Three crunchy bites."""
+    parts = []
+    for i in range(3):
+        n = int(SR * 0.11)
+        bite = bandpass(rng.standard_normal(n), 700, 4200) * env_decay(n, 0.02)
+        for _ in range(5):
+            j = rng.integers(0, n - 120)
+            bite[j : j + 120] += highpass(rng.standard_normal(120), 2000) * np.hanning(120) * 0.8
+        parts.append((0.02 + i * 0.26, fade(bite, 0.002, 0.02), 1.0 - 0.12 * i))
+    return place(parts, 0.8)
+
+
+def brush():
+    """One stroke of a stiff brush over a coat."""
+    x = sweep_noise(0.28, 1800, 3600, 0.9) * np.hanning(int(SR * 0.28)) ** 0.5
+    return fade(x, 0.02, 0.05)
+
+
+def pop():
+    """A soft rising blip, for hearts."""
+    n = t(0.14)
+    f = 520 * (980 / 520) ** (n / n[-1])
+    x = np.sin(2 * np.pi * np.cumsum(f) / SR) * np.exp(-n / 0.06)
+    return fade(x + 0.3 * np.sin(4 * np.pi * np.cumsum(f) / SR) * np.exp(-n / 0.04), 0.004, 0.03)
+
+
 def whinny_fallback():
     """Only used if no recorded whinny is supplied: a bright, falling, quavering call."""
     n = t(1.3)
@@ -274,6 +301,11 @@ ADELINE = {
     "defeat": ["a_defeat"],
     "fireball": ["a_fireball"],
     "woohoo": ["a_woohoo"],
+    "feed": ["a_feed"],
+    "shiny": ["a_shiny"],
+    "love": ["a_love"],
+    "happy": ["a_happy"],
+    "lovely": ["a_lovely", "a_like_it"],
 }
 GOBLIN = {
     "goblin_taunt": ["g_taunt", "g_nyeh"],
@@ -321,6 +353,9 @@ def main():
     sounds["thump"] = [save(out, "thump", thump(), 0.85)]
     sounds["snort"] = [save(out, "snort", snort(), 0.7)]
     sounds["fanfare"] = [save(out, "fanfare", fanfare(), 0.7)]
+    sounds["munch"] = [save(out, "munch", munch(), 0.75)]
+    sounds["brush"] = [save(out, "brush", brush(), 0.5)]
+    sounds["pop"] = [save(out, "pop", pop(), 0.6)]
 
     with open(os.path.join(out, "manifest.json"), "w") as f:
         json.dump({"sounds": sounds, "lines": lines}, f, indent=1)

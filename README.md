@@ -57,6 +57,24 @@ The course runs on real physics:
   reached at an easy pace.
 - `scripts/ride.gd` holds all of it. The forces and speeds are at the top.
 
+## At home
+
+Near the front door a "Go into the house" button appears, and near the stable a "Visit
+Spirit's stable" button.
+
+- **The living room.** Twelve things to put in it: sofa, armchair, rug, table, bookshelf,
+  lamp, plant, painting, clock, flowers, rocking horse and cushion. Tap one in the strip at
+  the bottom to add it, drag it anywhere, and tap it to choose one of eight colours, flip
+  it, change its size or remove it. Up to 30 things. Adeline walks over to look at whatever
+  was just moved. The room is saved as it was left, and a new adventure does not clear it.
+- **The stable.** Drag an apple, carrot, hay or oats to Spirit's mouth to feed her, drag the
+  brush over her coat to clean off the dust, and stroke her with the heart to pet her.
+  Three bars (Food, Shine, Love) fill up; when all three are full Spirit whinnies and hops.
+  The bars run down slowly while away (about twenty minutes from full to empty), so there
+  is always something to do on the next visit.
+- `scripts/indoors.gd` holds both rooms. Colours are made by turning each picture round the
+  colour wheel with a small shader, so one drawing gives every colour.
+
 ## Sound
 
 - Merlin speaks his lines. Adeline shouts when she strikes, casts, jumps, gets hurt, calls

@@ -11,6 +11,7 @@ const DialogScript := preload("res://scripts/dialog.gd")
 const HorseScript := preload("res://scripts/horse.gd")
 const RideScript := preload("res://scripts/ride.gd")
 const SoundScript := preload("res://scripts/sound.gd")
+const IndoorsScript := preload("res://scripts/indoors.gd")
 
 const GROUND_Y := 560.0
 const LEVEL_LEFT := 0.0
@@ -20,6 +21,7 @@ const RIDE_ZOOM := 1.15  # the riding course shows more of what is coming
 
 const HOUSE_X := 40.0  # left edge of the farmhouse
 const STABLE_X := 549.0  # where Spirit waits, inside the stable
+const DOOR_X := 238.0  # the front door of the house
 const START_X := 800.0
 const HUT_X := 1150.0  # middle of Merlin's hut
 const MERLIN_X := 1420.0
@@ -62,6 +64,8 @@ var horse = null
 var ride = null  # the riding course
 var sound = null  # voices, grunts and effects
 var sound_on := true
+var indoors = null  # the living room and the stable
+var place_action := ""  # a building Adeline is standing at: house or stable
 var zoom := CAMERA_ZOOM
 var merlin: Sprite2D
 var boat: Sprite2D
@@ -141,6 +145,10 @@ func _ready() -> void:
 
 	var layer := CanvasLayer.new()
 	add_child(layer)
+	indoors = Control.new()
+	indoors.set_script(IndoorsScript)
+	indoors.game = self
+	layer.add_child(indoors)
 	hud = Control.new()
 	hud.set_script(HudScript)
 	hud.game = self
@@ -431,7 +439,7 @@ func _update_limits() -> void:
 
 
 func input_locked() -> bool:
-	return mode == "title" or dialog.active or defeated or (mode == "ride" and ride.finished)
+	return mode == "title" or mode == "house" or mode == "stable" or dialog.active or defeated or (mode == "ride" and ride.finished)
 
 
 func toast(text: String) -> void:
@@ -562,9 +570,14 @@ func _check_triggers() -> void:
 
 func _update_context() -> void:
 	context_action = ""
+	place_action = ""
 	if mode != "play" or dialog.active or not encounter.is_empty():
 		return
 	var px: float = player.position.x
+	if absf(px - DOOR_X) <= 85.0:
+		place_action = "house"
+	elif absf(px - STABLE_X) <= 130.0:
+		place_action = "stable"
 	if absf(px - MERLIN_X) <= TALK_RANGE:
 		context_action = "talk"
 	elif px >= RIVER_X - 160.0:
@@ -745,6 +758,34 @@ func new_game_rect() -> Rect2:
 	return Rect2(s.x / 2.0 - 400.0, s.y * 0.56 + 124.0, 380.0, 54.0)
 
 
+func enter_rect() -> Rect2:
+	var s := get_viewport_rect().size
+	return Rect2(s.x / 2.0 - 180.0, 150.0, 360.0, 66.0)
+
+
+## Goes into the house to decorate, or into the stable to look after Spirit.
+func enter_place(which: String) -> void:
+	controls.release_all()
+	_dismount()
+	if which == "stable":
+		horse.place(STABLE_X)
+		sound.play("whinny", -6.0)
+	mode = which
+	place_action = ""
+	context_action = ""
+	indoors.open(which)
+
+
+func leave_place() -> void:
+	var was := mode
+	mode = "play"
+	indoors.close()
+	player.position.x = DOOR_X if was == "house" else STABLE_X - 110.0
+	player.velocity = Vector2.ZERO
+	player.reset_physics_interpolation()
+	_update_camera(0.0, true)
+
+
 func sound_rect() -> Rect2:
 	var s := get_viewport_rect().size
 	return Rect2(40.0, s.y - 96.0, 190.0, 56.0)
@@ -835,6 +876,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_start(not has_save())
 	elif has_pos and menu_rect().has_point(pos):
 		go_title()
+	elif mode == "play" and place_action != "" and has_pos and enter_rect().has_point(pos) and not dialog.active:
+		enter_place(place_action)
 	elif mode == "ride":
 		if ride.finished and ride.finish_time >= 0.8 and has_pos:
 			if again_rect().has_point(pos):
@@ -849,6 +892,7 @@ func _physics_process(delta: float) -> void:
 	_update_camera(delta, false)
 	if mode != "play":
 		context_action = ""
+		place_action = ""
 		return
 	if defeated:
 		defeat_time += delta

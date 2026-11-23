@@ -43,6 +43,22 @@
   "woohoo": [
    "a_woohoo.ogg"
   ],
+  "feed": [
+   "a_feed.ogg"
+  ],
+  "shiny": [
+   "a_shiny.ogg"
+  ],
+  "love": [
+   "a_love.ogg"
+  ],
+  "happy": [
+   "a_happy.ogg"
+  ],
+  "lovely": [
+   "a_lovely.ogg",
+   "a_like_it.ogg"
+  ],
   "goblin_taunt": [
    "g_taunt.ogg",
    "g_nyeh.ogg"
@@ -100,6 +116,15 @@
   ],
   "fanfare": [
    "fanfare.ogg"
+  ],
+  "munch": [
+   "munch.ogg"
+  ],
+  "brush": [
+   "brush.ogg"
+  ],
+  "pop": [
+   "pop.ogg"
   ]
  },
  "lines": {

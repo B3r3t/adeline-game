@@ -60,6 +60,10 @@ func _draw() -> void:
 	if game.mode == "ride":
 		_draw_ride(s)
 		return
+	if game.mode == "house" or game.mode == "stable":
+		return
+	if game.place_action != "" and not game.dialog.active:
+		_button(game.enter_rect(), "Go into the house" if game.place_action == "house" else "Visit Spirit's stable", 26, Color(0.3, 0.6, 0.35, 0.95))
 
 	var p = game.player
 	for i in p.MAX_HEALTH:
