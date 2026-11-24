@@ -114,8 +114,15 @@ var celebrated := false
 var sleep := 0
 var night := 0.0  # how dark the room has got, from 0 to 1
 
-# The bathroom: twelve teeth, each with its own grime, and toothpaste on the brush.
-var teeth: Array = []
+# The bathroom: plaque on her teeth, kept cell by cell, and toothpaste on the brush.
+var mirror: Node2D = null
+var mouth: Sprite2D = null
+var tooth_cells := PackedFloat32Array()  # how much of each cell is tooth
+var plaque_cells := PackedFloat32Array()  # how much plaque is left in each cell
+var plaque_image: Image = null
+var plaque_tex: ImageTexture = null
+var teeth_total := 0.0
+var plaque_total := 0.0
 var paste := 0.0
 var foam: Array = []  # bubbles: where, and how long each has left
 var teeth_done := true
@@ -148,10 +155,7 @@ func _save() -> void:
 		for thing in things:
 			list.append(thing["data"])
 		if room == "bathroom":
-			var grime := 0.0
-			for level in teeth:
-				grime += float(level)
-			home["teeth"] = { "clean": 1.0 - grime / maxf(teeth.size(), 1.0), "time": Time.get_unix_time_from_system() }
+			home["teeth"] = { "clean": 1.0 - plaque_left(), "time": Time.get_unix_time_from_system() }
 		elif room != "":
 			home["room" if room == "living" else "bedroom"] = list
 	home["care"]["time"] = Time.get_unix_time_from_system()
@@ -162,7 +166,7 @@ func _save() -> void:
 
 func _tex(name: String) -> Texture2D:
 	if not textures.has(name):
-		var ext := "jpg" if name == "room" or name == "stable" or name == "bedroom" or name == "bathroom" else "png"
+		var ext := "jpg" if name in ["room", "stable", "bedroom", "bathroom", "mouth", "plaque"] else "png"
 		textures[name] = load("res://art/room/%s.%s" % [name, ext])
 	return textures[name]
 
@@ -238,6 +242,8 @@ func close() -> void:
 	finger = -1
 	sleep = 0
 	night = 0.0
+	mirror = null
+	mouth = null
 	place = ""
 	visible = false
 
@@ -291,6 +297,10 @@ func _enter_room(which: String) -> void:
 	dragging = false
 	sleep = 0
 	_drop_tool(false)
+	if mirror != null:
+		mirror.queue_free()  # leaving the bathroom
+	mirror = null
+	mouth = null
 	room = which
 	backdrop.texture = _tex({ "living": "room", "bedroom": "bedroom", "bathroom": "bathroom" }[which])
 	_layout()
@@ -384,6 +394,28 @@ func _toggle_sleep() -> void:
 
 
 # --- The bathroom ------------------------------------------------------------
+# The mirror shows a close-up of Adeline's smile. Plaque is painted over her teeth and is
+# scrubbed away exactly where the brush goes, like rubbing frost off a window.
+
+const MOUTH_AT := Vector2(672.0, 322.0)  # the middle of the mirror, in the room
+const MOUTH_SIZE := Vector2(630.0, 420.0)
+const GRID := Vector2i(96, 64)  # how finely the plaque is kept track of
+
+# Lays the plaque over the teeth wherever some is left, and cuts the picture to an oval.
+const MOUTH_SHADER := "
+shader_type canvas_item;
+uniform sampler2D plaque : filter_linear;
+uniform sampler2D teeth : filter_linear;
+uniform sampler2D left : filter_linear;
+void fragment() {
+	vec4 c = texture(TEXTURE, UV);
+	float there = smoothstep(0.12, 0.5, texture(left, UV).r) * texture(teeth, UV).r;
+	c.rgb = mix(c.rgb, texture(plaque, UV).rgb, there * 0.93);
+	c.a = 1.0 - smoothstep(0.97, 1.0, length((UV - 0.5) * 2.0));
+	COLOR = c;
+}
+"
+
 
 func _open_bathroom() -> void:
 	at = Vector2(_to_room(Vector2(150.0, 0.0)).x, 712.0)  # beside the mirror, where she can be seen
@@ -391,130 +423,172 @@ func _open_bathroom() -> void:
 	facing = 1
 	paste = 0.0
 	foam.clear()
-	# Teeth get a little grubby again between visits.
+	# The mirror: a gold rim with her smile inside it.
+	mirror = Node2D.new()
+	mirror.position = MOUTH_AT
+	mirror.z_index = 2999
+	mirror.draw.connect(_draw_rim)
+	stage.add_child(mirror)
+	mouth = Sprite2D.new()
+	mouth.texture = _tex("mouth")
+	mouth.scale = MOUTH_SIZE / mouth.texture.get_size()
+	mirror.add_child(mouth)
+	# Where the teeth are, cell by cell.
+	var mask_tex := _tex("teeth_mask")
+	var mask := mask_tex.get_image()
+	if mask.is_compressed():
+		mask.decompress()
+	tooth_cells.resize(GRID.x * GRID.y)
+	teeth_total = 0.0
+	for y in GRID.y:
+		for x in GRID.x:
+			var value := mask.get_pixel(int((x + 0.5) / GRID.x * mask.get_width()), int((y + 0.5) / GRID.y * mask.get_height())).r
+			tooth_cells[y * GRID.x + x] = value
+			teeth_total += value
+	# Teeth get grubby again between visits. A fresh coat of plaque is patchy, not even.
 	var saved: Dictionary = home["teeth"]
 	var away := maxf(Time.get_unix_time_from_system() - float(saved["time"]), 0.0) if float(saved["time"]) > 0.0 else 99999.0
 	var grime := clampf(1.0 - float(saved["clean"]) + away / 1500.0, 0.0, 1.0)
-	teeth.clear()
-	for i in 12:
-		teeth.append(clampf(grime * randf_range(0.75, 1.0), 0.0, 1.0))
-	teeth_done = grime < 0.02
+	plaque_cells.resize(GRID.x * GRID.y)
+	plaque_image = Image.create(GRID.x, GRID.y, false, Image.FORMAT_L8)
+	plaque_total = 0.0
+	for y in GRID.y:
+		for x in GRID.x:
+			var patchy := 0.5 + 0.5 * sin(x * 0.55 + sin(y * 0.4) * 2.0) * sin(y * 0.6 + x * 0.21)
+			var value := 0.0
+			if grime > 0.03:
+				value = clampf(grime * 1.25 - (1.0 - grime) * patchy, 0.0, 1.0)
+			plaque_cells[y * GRID.x + x] = value
+			plaque_total += value * tooth_cells[y * GRID.x + x]
+			plaque_image.set_pixel(x, y, Color(value, value, value))
+	plaque_tex = ImageTexture.create_from_image(plaque_image)
+	var shader_code := Shader.new()
+	shader_code.code = MOUTH_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader_code
+	material.set_shader_parameter("plaque", _tex("plaque"))
+	material.set_shader_parameter("teeth", mask_tex)
+	material.set_shader_parameter("left", plaque_tex)
+	mouth.material = material
+	teeth_done = plaque_left() < 0.03
 	if not teeth_done:
 		game.sound.shout("adeline", "brush_teeth", 1.0, true)
 
 
-## Where the big mirror is drawn on screen, and the twelve teeth in it.
-func _mirror() -> Rect2:
-	var s := get_viewport_rect().size
-	var size := Vector2(minf(660.0, s.x * 0.52), minf(400.0, (s.y - TRAY) * 0.6))
-	return Rect2(Vector2(s.x / 2.0 - size.x / 2.0, 150.0), size)
+func _draw_rim() -> void:
+	var rim := PackedVector2Array()
+	for k in 56:
+		var a := TAU * k / 56.0
+		rim.append(Vector2(cos(a) * (MOUTH_SIZE.x / 2.0 + 18.0), sin(a) * (MOUTH_SIZE.y / 2.0 + 18.0)))
+	mirror.draw_colored_polygon(rim, Color(0.87, 0.62, 0.2))
+	mirror.draw_polyline(rim + PackedVector2Array([rim[0]]), Color(0.2, 0.12, 0.05), 5.0)
+	var inner := PackedVector2Array()
+	for k in 56:
+		var a := TAU * k / 56.0
+		inner.append(Vector2(cos(a) * (MOUTH_SIZE.x / 2.0 + 3.0), sin(a) * (MOUTH_SIZE.y / 2.0 + 3.0)))
+	mirror.draw_polyline(inner + PackedVector2Array([inner[0]]), Color(0.2, 0.12, 0.05), 4.0)
 
 
-func _tooth(i: int) -> Rect2:
-	var m := _mirror()
-	var w := m.size.x * 0.105
-	var upper := i < 6
-	var col := i % 6
-	var h := m.size.y * (0.2 if upper else 0.16)
-	# The middle teeth are a little bigger, as real front teeth are.
-	var grow := 1.0 + 0.12 * (1.0 - absf(col - 2.5) / 2.5)
-	var x := m.get_center().x + (col - 3) * w * 1.04
-	var y := m.get_center().y + (m.size.y * 0.02 - h * grow if upper else m.size.y * 0.06)
-	return Rect2(x, y, w, h * grow)
+## How much of the plaque is still on her teeth, from 0 to 1.
+func plaque_left() -> float:
+	return clampf(plaque_total / maxf(teeth_total, 1.0), 0.0, 1.0)
 
 
-## The end of the brush that does the work, on screen.
+## Where a spot on the picture of her mouth is in the room (0,0 is its top left, 1,1 its bottom right).
+func mouth_point(uv: Vector2) -> Vector2:
+	return MOUTH_AT - MOUTH_SIZE / 2.0 + uv * MOUTH_SIZE
+
+
+## The end of the brush that does the work, in the room.
 func _bristles() -> Vector2:
-	return _to_screen(tool_node.position + Vector2(92.0, -22.0) * tool_node.scale.x)
+	return tool_node.position + Vector2(92.0, -22.0) * tool_node.scale.x
+
+
+## Rubs plaque away around one spot. Returns whether there were teeth under the brush.
+func _scrub(uv: Vector2, amount: float) -> bool:
+	var reach := 6.5  # in cells
+	var cx := uv.x * GRID.x
+	var cy := uv.y * GRID.y
+	var on_teeth := false
+	var changed := false
+	for y in range(maxi(int(cy - reach), 0), mini(int(cy + reach) + 1, GRID.y)):
+		for x in range(maxi(int(cx - reach), 0), mini(int(cx + reach) + 1, GRID.x)):
+			var d := Vector2(x + 0.5 - cx, y + 0.5 - cy).length() / reach
+			if d >= 1.0:
+				continue
+			var i := y * GRID.x + x
+			if tooth_cells[i] > 0.3:
+				on_teeth = true
+			var old := plaque_cells[i]
+			if old <= 0.0 or amount <= 0.0:
+				continue
+			var now := maxf(old - amount * (1.0 - d * d), 0.0)
+			plaque_cells[i] = now
+			plaque_total -= (old - now) * tooth_cells[i]
+			plaque_image.set_pixel(x, y, Color(now, now, now))
+			changed = true
+	if changed:
+		plaque_tex.update(plaque_image)
+	return on_teeth
 
 
 func _brush_teeth(moved: float) -> void:
-	if moved <= 0.0:
-		return
 	var tip := _bristles()
-	var touched := false
-	for i in teeth.size():
-		if _tooth(i).grow(10.0).has_point(tip):
-			touched = true
-	# Only scrubbing counts: the brush has to be on the teeth before and after it moves.
-	var scrub := minf(moved, 40.0) if touched and on_her else 0.0
-	on_her = touched
-	if scrub <= 0.0:
+	var uv := (tip - (MOUTH_AT - MOUTH_SIZE / 2.0)) / MOUTH_SIZE
+	var touching := uv.x > 0.0 and uv.x < 1.0 and uv.y > 0.0 and uv.y < 1.0 and _scrub(uv, 0.0)
+	# Only scrubbing counts: the brush has to be on her teeth before and after it moves.
+	var stroked := minf(moved, 44.0) if touching and on_her else 0.0
+	on_her = touching
+	if stroked <= 0.0:
 		return
-	moved = scrub
-	for i in teeth.size():
-		if _tooth(i).grow(10.0).has_point(tip) and float(teeth[i]) > 0.0:
-			# Toothpaste does the work. A dry brush hardly helps.
-			teeth[i] = maxf(float(teeth[i]) - moved / (150.0 if paste > 0.0 else 6000.0), 0.0)
+	# Toothpaste does the work. A dry brush hardly helps.
+	_scrub(uv, stroked / (60.0 if paste > 0.0 else 3000.0))
 	if paste > 0.0:
-		paste = maxf(paste - moved / 2600.0, 0.0)
-		if int((stroke + moved) / 26.0) != int(stroke / 26.0):
-			foam.append([tip + Vector2(randf_range(-22.0, 22.0), randf_range(-16.0, 16.0)), randf_range(0.5, 1.0)])
-		if int((stroke + moved) / 150.0) != int(stroke / 150.0):
+		paste = maxf(paste - stroked / 3200.0, 0.0)
+		if int((stroke + stroked) / 24.0) != int(stroke / 24.0):
+			foam.append([_to_screen(tip) + Vector2(randf_range(-24.0, 24.0), randf_range(-18.0, 18.0)), randf_range(0.5, 1.0)])
+		if int((stroke + stroked) / 150.0) != int(stroke / 150.0):
 			game.sound.play("brush", -4.0, 0.15, 1.3)
 	elif note_time <= 0.0:
 		_say("Tap the toothpaste first.")
-	stroke += moved
-	if not teeth_done:
-		var grime := 0.0
-		for level in teeth:
-			grime += float(level)
-		if grime <= 0.0:
-			teeth_done = true
-			_say("Sparkling!")
-			game.sound.play("chime", -3.0, 0.0, 1.2)
-			game.sound.play("fanfare", -7.0, 0.0)
-			game.sound.shout("adeline", "all_clean", 1.0, true)
-			_save()
+	stroke += stroked
+	if not teeth_done and plaque_left() < 0.03:
+		# The last specks vanish and her teeth gleam.
+		for i in plaque_cells.size():
+			plaque_cells[i] = 0.0
+		plaque_image.fill(Color.BLACK)
+		plaque_tex.update(plaque_image)
+		plaque_total = 0.0
+		teeth_done = true
+		_say("Sparkling!")
+		for i in 10:
+			_sparkle(mouth_point(Vector2(randf_range(0.2, 0.8), randf_range(0.32, 0.72))))
+		game.sound.play("chime", -3.0, 0.0, 1.2)
+		game.sound.play("fanfare", -7.0, 0.0)
+		game.sound.shout("adeline", "all_clean", 1.0, true)
+		_save()
 
 
 func _draw_bathroom(s: Vector2) -> void:
-	var m := _mirror()
-	var c := m.get_center()
-	# The mirror, with Adeline's smile in it.
-	var rim := PackedVector2Array()
-	var glass := PackedVector2Array()
-	for k in 48:
-		var a := TAU * k / 48.0
-		rim.append(c + Vector2(cos(a) * (m.size.x / 2.0 + 16.0), sin(a) * (m.size.y / 2.0 + 16.0)))
-		glass.append(c + Vector2(cos(a) * m.size.x / 2.0, sin(a) * m.size.y / 2.0))
-	overlay.draw_colored_polygon(rim, Color(0.85, 0.6, 0.2))
-	overlay.draw_colored_polygon(glass, Color(0.99, 0.82, 0.7))
-	overlay.draw_polyline(rim + PackedVector2Array([rim[0]]), Color(0.2, 0.12, 0.05), 4.0)
-	overlay.draw_circle(c + Vector2(-m.size.x * 0.33, -m.size.y * 0.08), m.size.y * 0.1, Color(1.0, 0.6, 0.6, 0.45))
-	overlay.draw_circle(c + Vector2(m.size.x * 0.33, -m.size.y * 0.08), m.size.y * 0.1, Color(1.0, 0.6, 0.6, 0.45))
-	overlay.draw_arc(c + Vector2(0.0, -m.size.y * 0.36), m.size.y * 0.06, 0.3, PI - 0.3, 12, Color(0.75, 0.5, 0.4), 4.0)
-	var mouth := PackedVector2Array()
-	for k in 40:
-		var a := TAU * k / 40.0
-		mouth.append(c + Vector2(cos(a) * m.size.x * 0.36, m.size.y * 0.04 + sin(a) * m.size.y * 0.27))
-	overlay.draw_colored_polygon(mouth, Color(0.45, 0.1, 0.14))
-	overlay.draw_polyline(mouth + PackedVector2Array([mouth[0]]), Color(0.85, 0.25, 0.3), 9.0)
-	for i in teeth.size():
-		var t := _tooth(i)
-		overlay.draw_rect(t, Color.WHITE)
-		var grime: float = teeth[i]
-		if grime > 0.0:
-			overlay.draw_rect(t, Color(0.86, 0.74, 0.25, grime * 0.8))
-			if grime > 0.45:
-				overlay.draw_circle(t.position + t.size * Vector2(0.3, 0.4), t.size.x * 0.12, Color(0.5, 0.36, 0.12, grime * 0.8))
-				overlay.draw_circle(t.position + t.size * Vector2(0.68, 0.66), t.size.x * 0.09, Color(0.5, 0.36, 0.12, grime * 0.8))
-		elif int(clock * 2.0 + i * 0.37) % 5 == 0:
-			var p := t.position + t.size * Vector2(0.7, 0.28)
-			overlay.draw_line(p + Vector2(-7.0, 0.0), p + Vector2(7.0, 0.0), Color(0.6, 0.9, 1.0), 2.0)
-			overlay.draw_line(p + Vector2(0.0, -7.0), p + Vector2(0.0, 7.0), Color(0.6, 0.9, 1.0), 2.0)
-		overlay.draw_rect(t, Color(0.25, 0.2, 0.25), false, 2.0)
 	for bubble in foam:
-		overlay.draw_circle(bubble[0], 5.0 + 9.0 * float(bubble[1]), Color(1.0, 1.0, 1.0, 0.75 * float(bubble[1])))
-	# Toothpaste on the brush.
+		overlay.draw_circle(bubble[0], 5.0 + 9.0 * float(bubble[1]), Color(1.0, 1.0, 1.0, 0.8 * float(bubble[1])))
+		overlay.draw_arc(bubble[0], 5.0 + 9.0 * float(bubble[1]), 0.0, TAU, 14, Color(0.6, 0.8, 1.0, 0.7 * float(bubble[1])), 1.5)
+	# Toothpaste on the brush, and a dab on its picture in the tray while it is loaded.
 	if tool_node != null and paste > 0.0:
-		overlay.draw_circle(_bristles() + Vector2(0.0, -10.0), 6.0 + 9.0 * paste, Color(0.7, 0.95, 1.0))
-		overlay.draw_circle(_bristles() + Vector2(0.0, -10.0), 6.0 + 9.0 * paste, Color(0.2, 0.4, 0.6), false, 2.0)
+		var tip := _to_screen(_bristles()) + Vector2(0.0, -10.0)
+		overlay.draw_circle(tip, 6.0 + 9.0 * paste, Color(0.7, 0.95, 1.0))
+		overlay.draw_arc(tip, 6.0 + 9.0 * paste, 0.0, TAU, 16, Color(0.2, 0.4, 0.6), 2.0)
 	if paste > 0.0:
 		var cell := _cell_rect(1)
 		overlay.draw_circle(cell.position + Vector2(cell.size.x * 0.76, cell.size.y * 0.3), 8.0, Color(0.7, 0.95, 1.0))
+	# How clean her teeth are.
+	var bar := Rect2(s.x / 2.0 - 150.0, 66.0, 300.0, 18.0)
+	overlay.draw_rect(bar, Color(0.0, 0.0, 0.0, 0.45))
+	overlay.draw_rect(Rect2(bar.position, Vector2(bar.size.x * (1.0 - plaque_left()), bar.size.y)), Color(0.55, 0.9, 1.0))
+	overlay.draw_rect(bar, Color(1.0, 1.0, 1.0, 0.7), false, 2.0)
+	_text(Vector2(bar.position.x, 110.0), "Clean teeth", 18, Color.WHITE)
 	if clock < 10.0 and not teeth_done:
-		_text(Vector2(0.0, 132.0), "Tap the toothpaste, then drag the toothbrush over every tooth.", 22, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
+		_text(Vector2(0.0, s.y - TRAY - 22.0), "Tap the toothpaste, then scrub the plaque off every tooth.", 22, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
 
 
 ## What is known about a kind of furniture, from either room's list.
@@ -1165,7 +1239,7 @@ func _move(pos: Vector2) -> void:
 			_hold(_to_room(pos) + grab)
 		elif tool == "toothbrush" and tool_node != null:
 			var spot := _tool_spot(pos)
-			var moved: float = spot.distance_to(last_touch) * stage.scale.x
+			var moved: float = spot.distance_to(last_touch)
 			tool_node.position = spot
 			last_touch = spot
 			_brush_teeth(moved)

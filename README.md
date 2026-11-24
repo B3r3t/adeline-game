@@ -98,10 +98,14 @@ Spirit's stable" button.
   away. A touch picks the thing actually touched, not the empty corner of a bigger one.
   Tap the bare floor and Adeline walks there; she also comes over to look at whatever was
   just put down.
-- **The bathroom**, through a second door in the living room. A big mirror shows Adeline's
-  smile with twelve teeth, each with its own grime. Tap the toothpaste to load the brush,
-  then drag the toothbrush over every tooth; a dry brush hardly cleans, and the paste runs
-  out and needs topping up. Teeth get a little grubby again between visits.
+- **The bathroom**, through a second door in the living room. The mirror shows a close-up of
+  Adeline's smile with her teeth covered in plaque: yellow goo, crumbs and little green
+  germs. Tap the toothpaste to load the brush, then scrub. The plaque comes off exactly
+  where the brush goes, like rubbing frost off a window, so every tooth has to be reached.
+  A dry brush hardly cleans, and the paste runs out and needs topping up. A bar shows how
+  clean her teeth are. They get a little grubby again between visits.
+  The smile and the plaque are two drawings; `art_src/build_room.py` finds the teeth in the
+  first (the bright, colourless patches) so the plaque is only ever laid over teeth.
 - **Sleeping.** In the bedroom, "Go to sleep" sends Adeline to her bed (the room needs one),
   where she lies down, the room goes dark and little Z's drift up. A tap wakes her. In the
   stable, "Bedtime for Spirit" does the same for Spirit, who dozes standing up as horses do.
