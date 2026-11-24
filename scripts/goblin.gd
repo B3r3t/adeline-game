@@ -48,24 +48,35 @@ var max_x := INF
 var rig = null
 var shown_squash := 1.0
 
+# The ogre is a goblin writ large: the same thinking, different drawings and numbers.
+var art := "res://art/goblin"
+var size := 1.0  # how many times bigger than a goblin
+var tough := false  # shrugs off every hit unless something has its attention
+var dazed := 0.0  # seconds left of being bowled over, or of staring at something else
+var cries := { "attack": "goblin_attack", "hurt": "goblin_hurt", "down": "goblin_down" }
+var mouth := "goblin"
+var walk_speed := WALK_SPEED
+var max_health := MAX_HEALTH
+var swing_windup := SWING_WINDUP
+
 
 func _ready() -> void:
 	collision_layer = 4
 	collision_mask = 1
 	var shape := RectangleShape2D.new()
-	shape.size = Vector2(WIDTH, HEIGHT)
+	shape.size = Vector2(WIDTH, HEIGHT) * size
 	var col := CollisionShape2D.new()
 	col.shape = shape
-	col.position = Vector2(0.0, -HEIGHT / 2.0)
+	col.position = Vector2(0.0, -HEIGHT * size / 2.0)
 	add_child(col)
 	rig = Node2D.new()
 	rig.set_script(RigScript)
 	add_child(rig)
-	rig.build("res://art/goblin")
+	rig.build(art)
 
 
 func body_rect() -> Rect2:
-	return Rect2(position.x - WIDTH / 2.0, position.y - HEIGHT, WIDTH, HEIGHT)
+	return Rect2(position.x - WIDTH * size / 2.0, position.y - HEIGHT * size, WIDTH * size, HEIGHT * size)
 
 
 func is_dead() -> bool:
@@ -80,13 +91,14 @@ func _set_state(new_state: int) -> void:
 	state = new_state
 	state_time = 0.0
 	if new_state == State.SWING_WINDUP or new_state == State.CHARGE_WINDUP:
-		game.sound.shout("goblin", "goblin_attack", 1.0, true, -2.0)
+		game.sound.shout(mouth, cries["attack"], 1.0, true, -2.0)
 
 
 func _physics_process(delta: float) -> void:
 	anim_time += delta
 	state_time += delta
 	flash = maxf(flash - delta, 0.0)
+	dazed = maxf(dazed - delta, 0.0)
 	knock = move_toward(knock, 0.0, 900.0 * delta)
 	if not is_on_floor():
 		velocity.y += GRAVITY * delta
@@ -103,7 +115,7 @@ func _physics_process(delta: float) -> void:
 			_approach(dist, toward)
 		State.SWING_WINDUP:
 			facing = toward  # keeps turning until the warning ends, then locks
-			if state_time >= SWING_WINDUP:
+			if state_time >= swing_windup:
 				hit_done = false
 				_set_state(State.SWING_ACTIVE)
 		State.SWING_ACTIVE:
@@ -156,7 +168,7 @@ func _approach(dist: float, toward: int) -> void:
 	var can_swing := attacks != "charge"
 	var can_charge := attacks != "swing"
 	var charge_min := CHARGE_MIN_RANGE if can_swing else 60.0
-	if may_attack and can_swing and dist <= SWING_RANGE:
+	if may_attack and can_swing and dist <= SWING_RANGE * size:
 		if game.request_attack(self):
 			_set_state(State.SWING_WINDUP)
 			return
@@ -166,8 +178,8 @@ func _approach(dist: float, toward: int) -> void:
 			return
 	if game.can_attack(self):
 		# Free to attack: close the gap.
-		if dist > SWING_RANGE * 0.8:
-			velocity.x = toward * WALK_SPEED
+		if dist > SWING_RANGE * size * 0.8:
+			velocity.x = toward * walk_speed
 	else:
 		# Another goblin is attacking: wait at a distance and leave room to escape.
 		var want := 300.0 + 110.0 * hold_slot
@@ -177,25 +189,44 @@ func _approach(dist: float, toward: int) -> void:
 			velocity.x = -toward * WALK_SPEED * 0.8
 
 
+## Knocked dizzy, or caught staring at something: it stops what it is doing, turns to look
+## at `look_x`, and can be hurt until it gathers itself.
+func daze(seconds: float, look_x: float) -> void:
+	if state == State.DEAD:
+		return
+	game.release_attack(self)
+	dazed = seconds
+	recovery_length = seconds
+	facing = 1 if look_x >= position.x else -1
+	_set_state(State.RECOVERY)
+
+
 func swing_rect() -> Rect2:
-	var x0 := position.x if facing > 0 else position.x - SWING_REACH
-	return Rect2(x0, position.y - HEIGHT - 24.0, SWING_REACH, HEIGHT + 24.0)
+	var reach := SWING_REACH * size
+	var x0 := position.x if facing > 0 else position.x - reach
+	return Rect2(x0, position.y - (HEIGHT + 24.0) * size, reach, (HEIGHT + 24.0) * size)
 
 
 func take_damage(amount: int, from_dir: int) -> void:
 	if state == State.DEAD:
 		return
+	if tough and dazed <= 0.0:
+		# Nothing gets through while it is paying attention.
+		flash = 0.06
+		game.sound.play("thump", -8.0, 0.1)
+		game.on_hit_shrugged_off(self)
+		return
 	health -= amount
 	flash = 0.15
 	game.sound.play("hit", -6.0, 0.12)
 	if health > 0:
-		game.sound.shout("goblin", "goblin_hurt", 0.6)
+		game.sound.shout(mouth, cries["hurt"], 0.6)
 	if state == State.APPROACH or state == State.RECOVERY:
 		knock = from_dir * 180.0
 	if health <= 0:
 		health = 0
 		_set_state(State.DEAD)
-		game.sound.shout("goblin", "goblin_down", 1.0, true)
+		game.sound.shout(mouth, cries["down"], 1.0, true)
 		game.release_attack(self)
 		game.on_goblin_defeated(self)
 
@@ -266,9 +297,9 @@ func _animate() -> void:
 	# Crouching and springing up are eased, not snapped.
 	shown_squash = lerpf(shown_squash, squash, minf(get_physics_process_delta_time() * 18.0, 1.0))
 	if signf(rig.scale.x) != float(facing):
-		rig.scale = Vector2(facing, shown_squash)
+		rig.scale = Vector2(facing, shown_squash) * size
 		rig.reset_physics_interpolation()
-	rig.scale = Vector2(facing, shown_squash)
+	rig.scale = Vector2(facing, shown_squash) * size
 	if state == State.SWING_ACTIVE:
 		rig.sharp["arm"] = true  # the swing has its own timing
 	rig.pose = pose
@@ -278,6 +309,7 @@ func _animate() -> void:
 
 func _draw() -> void:
 	# Warnings and markers only. The goblin himself is the rig.
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2(size, size))
 	var f := float(facing)
 	var pulse := 0.5 + 0.5 * sin(anim_time * 22.0)
 	var warn := Color(0, 0, 0, 0)
@@ -304,12 +336,13 @@ func _draw() -> void:
 		draw_rect(Rect2(-5.0, mark_y, 10.0, 24.0), warn)
 		draw_circle(Vector2(0.0, mark_y + 34.0), 6.0, warn)
 	# Dizzy stars while recovering: this is the moment to hit back.
-	if state == State.RECOVERY:
+	if state == State.RECOVERY and (dazed > 0.0 or not tough):
 		for i in 3:
 			var a := anim_time * 5.0 + i * TAU / 3.0
 			draw_circle(Vector2(cos(a) * 22.0, -HEIGHT - 26.0 + sin(a) * 6.0), 4.0, Color(1.0, 0.95, 0.5))
 	# Health pips.
 	if state != State.DEAD:
-		for i in MAX_HEALTH:
+		var pip := 1.0 / size
+		for i in max_health:
 			var c := Color(0.9, 0.2, 0.25) if i < health else Color(0.0, 0.0, 0.0, 0.3)
-			draw_rect(Rect2(-MAX_HEALTH * 6.0 + i * 12.0, -HEIGHT - 84.0, 10.0, 6.0), c)
+			draw_rect(Rect2((-max_health * 6.0 + i * 12.0) * pip, -HEIGHT - 84.0 * pip, 10.0 * pip, 6.0 * pip), c)

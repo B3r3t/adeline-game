@@ -168,7 +168,7 @@ func _draw() -> void:
 				_label(c + Vector2(0.0, r * 0.62), "SHIELD")
 				_cooldown(c, r, game.player.shield_cd / game.player.SHIELD_COOLDOWN, Color(0.6, 0.85, 1.0))
 			"interact":
-				var words := { "talk": "TALK", "boat": "LOOK", "ride": "RIDE", "dismount": "HOP OFF", "call": "CALL" }
+				var words := { "talk": "TALK", "sister": "SISTER", "stay": "STAY", "come": "COME", "fly": "FLY", "open": "OPEN", "boat": "LOOK", "ride": "RIDE", "dismount": "HOP OFF", "call": "CALL" }
 				var word: String = words.get(game.context_action, "")
 				draw_string(font, Vector2(c.x - 60.0, c.y + 8.0), word, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 24 if word.length() <= 4 else 19, Color(1.0, 1.0, 1.0, 0.98))
 

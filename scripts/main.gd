@@ -291,7 +291,7 @@ func _add_wall(rect: Rect2) -> void:
 # --- Saved progress ---------------------------------------------------------
 
 func _default_data() -> Dictionary:
-	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {} }
+	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "m2": "available", "m2_step": 0 }
 
 
 func has_save() -> bool:
@@ -426,6 +426,7 @@ func _start(new_game: bool) -> void:
 func _place_player() -> void:
 	_clear_goblins()
 	ride.clear()
+	sister.reset()
 	zoom = CAMERA_ZOOM
 	camera.zoom = Vector2(zoom, zoom)
 	encounter = {}
@@ -452,7 +453,7 @@ func _update_limits() -> void:
 
 
 func input_locked() -> bool:
-	return mode == "title" or mode == "house" or mode == "stable" or dialog.active or defeated or (mode == "ride" and ride.finished)
+	return mode == "title" or mode == "house" or mode == "stable" or dialog.active or defeated or (mode == "ride" and ride.finished) or (mode == "play" and sister.busy())
 
 
 func toast(text: String) -> void:
@@ -591,8 +592,12 @@ func _update_context() -> void:
 		place_action = "house"
 	elif absf(px - STABLE_X) <= 130.0:
 		place_action = "stable"
+	if sister.activity != "":
+		return  # racing or having her hair done: nothing else to tap
 	if absf(px - MERLIN_X) <= TALK_RANGE:
 		context_action = "talk"
+	elif absf(px - sister.x) <= 105.0 and not player.mounted and sister.mode != "stay" and sister.mode != "charge":
+		context_action = "sister"
 	elif px >= RIVER_X - 160.0:
 		context_action = "boat"
 	elif player.mounted:
@@ -620,6 +625,8 @@ func _interact() -> void:
 	elif context_action == "talk":
 		_dismount()
 		_talk_to_merlin()
+	elif context_action == "sister":
+		_talk_to_sister()
 	elif context_action == "boat":
 		_dismount()
 		dialog.say("", ["The magic boat rocks gently on the river.", "It will fly to the other islands once the rescue mission is ready."])
@@ -644,6 +651,33 @@ func _dismount() -> void:
 	horse.set_mounted(false)
 	horse.position = Vector2(player.position.x, GROUND_Y)
 	player.position.x += player.facing * 80.0
+
+
+## Things to do with her little sister. Small and quick, and none of them is a mission.
+func _talk_to_sister() -> void:
+	var rows := [
+		{ "id": "race", "label": "Race you on foot!", "status": "Play", "enabled": true },
+		{ "id": "hair", "label": "Do her hair", "status": "Play", "enabled": true },
+	]
+	if sister.mode == "follow":
+		rows.append({ "id": "play", "label": "Off you go and play", "status": "", "enabled": true })
+	else:
+		rows.append({ "id": "follow", "label": "Come with me", "status": "", "enabled": true })
+	dialog.choose("Your little sister", rows, _on_sister_picked)
+
+
+func _on_sister_picked(id: String) -> void:
+	if id == "race":
+		sister.start_race()
+	elif id == "hair":
+		sister.do_hair()
+	elif id == "follow":
+		sister.follow()
+		sound.shout("sister", "sister_coming", 1.0, true)
+		toast("She will ride along behind you.")
+	elif id == "play":
+		sister.roam()
+		sound.shout("sister", "sister_whee", 1.0, true)
 
 
 func _talk_to_merlin() -> void:
