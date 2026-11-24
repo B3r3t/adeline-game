@@ -98,6 +98,20 @@ PONY = {
 }
 
 
+# The ogre: the goblin's shape of puppet, drawn big. He is exported at his real size so he
+# stays sharp, and the goblin script moves him.
+OGRE = {
+    "name": "ogre", "sheet": "ogre_a", "height": 150.0, "measure": ["leg_near", "head"],
+    "parts": [
+        ("body", 2, 1.0, (178, 326), None, None, 2),
+        ("leg_far", 4, 1.0, (105, 24), "body", (218, 306), 0),
+        ("leg_near", 3, 1.0, (105, 24), "body", (146, 310), 1),
+        ("arm", 1, 0.95, (42, 215), "body", (236, 104), 4),
+        ("head", 0, 0.92, (150, 250), "body", (196, 34), 3),
+    ],
+}
+
+
 def rot(v, deg):
     r = math.radians(deg)
     return (v[0] * math.cos(r) - v[1] * math.sin(r), v[0] * math.sin(r) + v[1] * math.cos(r))
@@ -196,7 +210,7 @@ def export(spec, parts_dir, out_dir):
 if __name__ == "__main__":
     parts_dir, out_root = sys.argv[1], sys.argv[2]
     preview = sys.argv[3] if len(sys.argv) > 3 else None
-    for spec in (ADELINE, SPIRIT, GOBLIN, SISTER, PONY):
+    for spec in (ADELINE, SPIRIT, GOBLIN, SISTER, PONY, OGRE):
         export(spec, parts_dir, os.path.join(out_root, spec["name"]))
     if preview:
         render(ADELINE, parts_dir, [
@@ -231,3 +245,9 @@ if __name__ == "__main__":
             {"leg_front_near_upper": -54, "leg_front_near_lower": 88, "leg_front_far_upper": -49, "leg_front_far_lower": 83,
              "leg_hind_near_upper": 36, "leg_hind_near_lower": 10, "leg_hind_far_upper": 31, "leg_hind_far_lower": 10, "tail": 30, "body": -10},
         ], os.path.join(preview, "pony_poses.png"), px_per_world=4.0, cell=(640, 520))
+        render(OGRE, parts_dir, [
+            {},
+            {"leg_near": 28, "leg_far": -28},
+            {"arm": -70, "body": -8, "leg_near": 8, "leg_far": 8},
+            {"arm": 75, "body": 8, "leg_near": -8, "leg_far": -8},
+        ], os.path.join(preview, "ogre_poses.png"), px_per_world=2.6, cell=(520, 480))

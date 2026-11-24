@@ -303,6 +303,10 @@ MERLIN = [
     "Tap SHIELD just before an attack lands and it will bounce right off.",
     "Head east past the signpost and send those goblins packing.",
     "Your wand strikes fast up close. Your fireball hits three times as hard, but it needs a moment between casts.",
+    "The ogre has locked your mother and father in his fort on the island across the water.",
+    "Its gate only opens when two stones are pressed at the very same moment. Nobody can do that alone.",
+    "Fetch your little sister. Then take the flying boat at the river.",
+    "You brought them home! I never doubted the two of you for a moment.",
 ]
 
 # name in the game -> the recordings (file stems) that can play for it
@@ -332,6 +336,17 @@ ADELINE = {
 SISTER = {
     "sister_hello": ["s_hi"],
     "sister_whee": ["s_whee", "s_look"],
+    "sister_race": ["s_race"],
+    "sister_love": ["s_love"],
+    "sister_coming": ["s_coming"],
+    "sister_charge": ["s_charge"],
+    "sister_stay": ["s_stay"],
+    "sister_family": ["s_family"],
+}
+OGRE = {
+    "ogre_roar": ["o_roar"],
+    "ogre_hurt": ["o_hurt"],
+    "ogre_down": ["o_down"],
 }
 GOBLIN = {
     "goblin_taunt": ["g_taunt", "g_nyeh"],
@@ -363,6 +378,9 @@ def main():
     for name, stems in SISTER.items():
         # The little sister is the same kind of voice pitched a little higher.
         sounds[name] = [f for f in (recorded(s, pitch=1.1, speed=1.0, level=-17.0) for s in stems) if f]
+    for name, stems in OGRE.items():
+        # The ogre is the goblin voice slowed and dropped a long way, so he sounds huge.
+        sounds[name] = [f for f in (recorded(s, pitch=0.7, speed=0.92, level=-15.0) for s in stems) if f]
     for name, stems in GOBLIN.items():
         # Goblins are small and nasty: the recordings are pitched up and hurried a little.
         sounds[name] = [f for f in (recorded(s, pitch=1.32, speed=1.1, level=-18.0) for s in stems) if f]

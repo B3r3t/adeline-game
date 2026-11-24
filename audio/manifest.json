@@ -75,6 +75,33 @@
    "s_whee.ogg",
    "s_look.ogg"
   ],
+  "sister_race": [
+   "s_race.ogg"
+  ],
+  "sister_love": [
+   "s_love.ogg"
+  ],
+  "sister_coming": [
+   "s_coming.ogg"
+  ],
+  "sister_charge": [
+   "s_charge.ogg"
+  ],
+  "sister_stay": [
+   "s_stay.ogg"
+  ],
+  "sister_family": [
+   "s_family.ogg"
+  ],
+  "ogre_roar": [
+   "o_roar.ogg"
+  ],
+  "ogre_hurt": [
+   "o_hurt.ogg"
+  ],
+  "ogre_down": [
+   "o_down.ogg"
+  ],
   "goblin_taunt": [
    "g_taunt.ogg",
    "g_nyeh.ogg"
@@ -167,6 +194,10 @@
   "Here is your reward: the Magic Shield.": "merlin_6.ogg",
   "Tap SHIELD just before an attack lands and it will bounce right off.": "merlin_7.ogg",
   "Head east past the signpost and send those goblins packing.": "merlin_8.ogg",
-  "Your wand strikes fast up close. Your fireball hits three times as hard, but it needs a moment between casts.": "merlin_9.ogg"
+  "Your wand strikes fast up close. Your fireball hits three times as hard, but it needs a moment between casts.": "merlin_9.ogg",
+  "The ogre has locked your mother and father in his fort on the island across the water.": "merlin_10.ogg",
+  "Its gate only opens when two stones are pressed at the very same moment. Nobody can do that alone.": "merlin_11.ogg",
+  "Fetch your little sister. Then take the flying boat at the river.": "merlin_12.ogg",
+  "You brought them home! I never doubted the two of you for a moment.": "merlin_13.ogg"
  }
 }

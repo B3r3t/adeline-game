@@ -31,6 +31,27 @@ Combat numbers, all at the top of `scripts/player.gd` and `scripts/goblin.gd`
 - Fireball: 3 damage, 1.2 seconds between casts. It also works from the saddle.
 - Goblin: 10 health. Each attack warns for 0.9 seconds, then recovers for about a second.
 
+## Mission 2: Rescue Mom and Dad
+
+Merlin offers it once the goblins are dealt with. Adeline cannot do it alone, which is the
+point: her little sister is needed three times.
+
+1. Fetch her sister (walk up to her, tap SISTER, pick the rescue). She follows on her pony.
+2. Take the flying boat at the river. It will not leave without her sister.
+3. Goblin guards. Every few seconds her sister charges from one end of the fight to the
+   other; goblins she passes see stars and lose a little health.
+4. The fort gate. Two stones must be pressed at once. Stand on one and tap STAY so she waits
+   there, then run to the other.
+5. The ogre. Nothing hurts him while he is paying attention. When her sister gallops past he
+   turns to watch her, and only then can he be hit.
+6. Open the cage and everyone flies home. Mom and Dad stand by the house from then on.
+
+- `scripts/mission2.gd` holds the mission and the island (the ground past the river). Where
+  things stand on the island is at the top of the file. Progress is saved after each step.
+- The ogre is the goblin script with its own drawings and numbers (`scripts/main.gd`,
+  `_spawn_goblins`): bigger, slower, tougher, and only hurt while dazed.
+- Her sister can follow, stay on a spot or charge to one (`scripts/sister.gd`).
+
 ## Ride with Spirit
 
 A second way to play, chosen on the title screen. Spirit gallops a course on her own and the
@@ -78,6 +99,16 @@ a five-year-old with a big head and short legs, and a round, shaggy pony with a 
 short sturdy legs. A big character made small still looks like a small adult or a toy horse,
 which is why they are not Adeline and Spirit shrunk. The pony uses the same script as Spirit
 (`scripts/horse.gd`) and is told which drawings to wear and where her rider sits.
+
+She is drawn as a younger Adeline (same face, freckles, hair and outfit, her own yellow
+cloak), so they look like sisters. Walk up to her and tap SISTER for things to do together:
+
+- Race you on foot: she hops off her pony, they line up, 3-2-1-GO, first past the flag.
+  She runs a little slower than Adeline, so it is close but winnable.
+- Do her hair: a brush, some sparkles, and her ribbon changes to the next of six colours.
+  The colour is remembered.
+- Come with me / Off you go and play: she rides along behind Adeline, or goes back to
+  wandering.
 
 ## At home
 

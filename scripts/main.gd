@@ -13,6 +13,7 @@ const RideScript := preload("res://scripts/ride.gd")
 const SoundScript := preload("res://scripts/sound.gd")
 const IndoorsScript := preload("res://scripts/indoors.gd")
 const SisterScript := preload("res://scripts/sister.gd")
+const Mission2Script := preload("res://scripts/mission2.gd")
 
 const GROUND_Y := 560.0
 const LEVEL_LEFT := 0.0
@@ -63,6 +64,7 @@ const ENCOUNTERS := [
 var player = null
 var horse = null
 var sister = null  # Adeline's little sister, on her pony
+var mission2 = null  # the rescue of Mom and Dad, and the island it happens on
 var ride = null  # the riding course
 var sound = null  # voices, grunts and effects
 var sound_on := true
@@ -113,6 +115,11 @@ func _ready() -> void:
 	_build_backdrop()
 	_build_ground()
 	_build_scenery()
+
+	mission2 = Node2D.new()
+	mission2.set_script(Mission2Script)
+	mission2.game = self
+	add_child(mission2)
 
 	ride = Node2D.new()
 	ride.set_script(RideScript)
@@ -291,7 +298,7 @@ func _add_wall(rect: Rect2) -> void:
 # --- Saved progress ---------------------------------------------------------
 
 func _default_data() -> Dictionary:
-	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "m2": "available", "m2_step": 0 }
+	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "m2": "available", "m2_step": 0, "m2_thanked": false }
 
 
 func has_save() -> bool:
@@ -436,6 +443,7 @@ func _place_player() -> void:
 	player.reset(Vector2(cx, GROUND_Y))
 	# Spirit starts in the stable, or close by when continuing from far along the island.
 	horse.place(STABLE_X if cx < 1000.0 else cx - 130.0)
+	mission2.restore()
 	_update_limits()
 	_update_camera(0.0, true)
 
@@ -445,6 +453,9 @@ func _update_limits() -> void:
 	var hi := RIVER_X - 30.0
 	if data["m1"] == "available":
 		hi = GATE_X
+	if mission2.on_island:
+		lo = mission2.LEFT + 40.0
+		hi = mission2.wall()
 	if not encounter.is_empty():
 		lo = float(encounter["left"])
 		hi = float(encounter["right"])
@@ -453,7 +464,7 @@ func _update_limits() -> void:
 
 
 func input_locked() -> bool:
-	return mode == "title" or mode == "house" or mode == "stable" or dialog.active or defeated or (mode == "ride" and ride.finished) or (mode == "play" and sister.busy())
+	return mode == "title" or mode == "house" or mode == "stable" or dialog.active or defeated or (mode == "ride" and ride.finished) or (mode == "play" and (sister.busy() or mission2.fading()))
 
 
 func toast(text: String) -> void:
@@ -491,6 +502,18 @@ func _spawn_goblins() -> void:
 		g.set_script(GoblinScript)
 		g.game = self
 		g.attacks = spec["attacks"]
+		if spec.get("ogre", false):
+			# The ogre is slow and huge, and nothing hurts him unless something has his attention.
+			g.art = "res://art/ogre"
+			g.size = 1.9
+			g.draw_size = 1.0
+			g.tough = true
+			g.max_health = 14
+			g.health = 14
+			g.walk_speed = 85.0
+			g.swing_windup = 1.15
+			g.mouth = "ogre"
+			g.cries = { "attack": "ogre_roar", "hurt": "ogre_hurt", "down": "ogre_down" }
 		g.hold_slot = i
 		g.think = 0.6 + 0.4 * i
 		g.min_x = float(encounter["left"]) + 20.0
@@ -520,6 +543,10 @@ func release_attack(goblin) -> void:
 		attacker = null
 
 
+func on_hit_shrugged_off(_goblin) -> void:
+	mission2.on_shrugged()
+
+
 func goblins_left() -> int:
 	var n := 0
 	for g in goblins:
@@ -538,6 +565,8 @@ func _encounter_cleared() -> void:
 		data["cleared"] = cleared() + 1
 		data["checkpoint_x"] = player.position.x
 		toast("Goblins defeated! Progress saved.")
+	elif encounter_kind == "m2":
+		pass  # the mission says what happens next, below
 	else:
 		data["practice_round"] = mini(int(data["practice_round"]) + 1, 3)
 		toast("Practice fight won!")
@@ -545,6 +574,8 @@ func _encounter_cleared() -> void:
 	encounter_kind = ""
 	attacker = null
 	player.health = player.MAX_HEALTH
+	if mission2.on_island:
+		mission2.on_fight_won()
 	_update_limits()
 	_save()
 	sound.play("fanfare", -5.0, 0.0)
@@ -588,6 +619,9 @@ func _update_context() -> void:
 	if mode != "play" or dialog.active or not encounter.is_empty():
 		return
 	var px: float = player.position.x
+	if mission2.on_island:
+		context_action = mission2.island_context()
+		return
 	if absf(px - DOOR_X) <= 85.0:
 		place_action = "house"
 	elif absf(px - STABLE_X) <= 130.0:
@@ -606,9 +640,12 @@ func _update_context() -> void:
 		context_action = "ride"
 	else:
 		context_action = "call"
+	context_action = mission2.home_context(context_action)
 
 
 func merlin_has_news() -> bool:
+	if data["m1"] == "done":
+		return data["m2"] == "available" or (data["m2"] == "done" and not data["m2_thanked"])
 	return data["m1"] == "available" or (data["m1"] == "active" and cleared() >= ENCOUNTERS.size())
 
 
@@ -627,9 +664,16 @@ func _interact() -> void:
 		_talk_to_merlin()
 	elif context_action == "sister":
 		_talk_to_sister()
+	elif context_action in ["fly", "stay", "come", "open"]:
+		mission2.interact(context_action)
 	elif context_action == "boat":
 		_dismount()
-		dialog.say("", ["The magic boat rocks gently on the river.", "It will fly to the other islands once the rescue mission is ready."])
+		if data["m2"] == "active":
+			dialog.say("", ["The magic boat rocks gently on the river.", "It will not leave without your little sister. Bring her with you."])
+		elif data["m2"] == "done":
+			dialog.say("", ["The magic boat rocks gently on the river, home from Ogre Island."])
+		else:
+			dialog.say("", ["The magic boat rocks gently on the river.", "Merlin will know where it should fly."])
 
 
 func _mount() -> void:
@@ -659,7 +703,11 @@ func _talk_to_sister() -> void:
 		{ "id": "race", "label": "Race you on foot!", "status": "Play", "enabled": true },
 		{ "id": "hair", "label": "Do her hair", "status": "Play", "enabled": true },
 	]
-	if sister.mode == "follow":
+	if data["m2"] == "active" and int(data["m2_step"]) == 0:
+		rows.insert(0, { "id": "m2", "label": "Come and help rescue Mom and Dad!", "status": "Mission", "enabled": true })
+	if data["m2"] == "active" and int(data["m2_step"]) >= 1:
+		pass  # she is on the mission and stays with Adeline
+	elif sister.mode == "follow":
 		rows.append({ "id": "play", "label": "Off you go and play", "status": "", "enabled": true })
 	else:
 		rows.append({ "id": "follow", "label": "Come with me", "status": "", "enabled": true })
@@ -667,7 +715,9 @@ func _talk_to_sister() -> void:
 
 
 func _on_sister_picked(id: String) -> void:
-	if id == "race":
+	if id == "m2":
+		mission2.sister_joins()
+	elif id == "race":
 		sister.start_race()
 	elif id == "hair":
 		sister.do_hair()
@@ -699,6 +749,15 @@ func _talk_to_merlin() -> void:
 			"Here is your reward: the Magic Shield.",
 			"Tap SHIELD just before an attack lands and it will bounce right off.",
 		], _give_shield)
+	elif data["m2"] == "done" and not data["m2_thanked"]:
+		data["m2_thanked"] = true
+		_save()
+		dialog.say("Merlin", ["You brought them home! I never doubted the two of you for a moment."], _show_missions)
+	elif data["m2"] == "active":
+		dialog.say("Merlin", [
+			"Fetch your little sister. Then take the flying boat at the river.",
+			"Its gate only opens when two stones are pressed at the very same moment. Nobody can do that alone.",
+		])
 	else:
 		_show_missions()
 
@@ -708,7 +767,7 @@ func _show_missions() -> void:
 	var status := { "available": "Available", "active": "Active", "done": "Completed" }
 	var rows := [
 		{ "id": "m1", "label": "Goblin Trouble", "status": status[m1], "enabled": m1 == "available" },
-		{ "id": "m2", "label": "Rescue Adeline's Parents", "status": "Coming soon" if m1 == "done" else "Locked", "enabled": false },
+		{ "id": "m2", "label": "Rescue Mom and Dad", "status": status[str(data["m2"])] if m1 == "done" else "Locked", "enabled": m1 == "done" and data["m2"] == "available" },
 	]
 	if m1 == "done":
 		var n := int(data["practice_round"])
@@ -724,6 +783,15 @@ func _on_mission_picked(id: String) -> void:
 		dialog.say("Merlin", [
 			"Head east past the signpost and send those goblins packing.",
 			"Your wand strikes fast up close. Your fireball hits three times as hard, but it needs a moment between casts.",
+		])
+	elif id == "m2":
+		data["m2"] = "active"
+		data["m2_step"] = 0
+		_save()
+		dialog.say("Merlin", [
+			"The ogre has locked your mother and father in his fort on the island across the water.",
+			"Its gate only opens when two stones are pressed at the very same moment. Nobody can do that alone.",
+			"Fetch your little sister. Then take the flying boat at the river.",
 		])
 	elif id == "practice":
 		_begin_practice()
@@ -755,6 +823,8 @@ func _begin_practice() -> void:
 func objective() -> String:
 	if not encounter.is_empty():
 		var total: int = encounter["goblins"].size()
+		if encounter.has("title"):
+			return str(encounter["title"])
 		if total == 1:
 			return "Defeat the goblin"
 		return "Defeat the goblins: %d left" % goblins_left()
@@ -763,6 +833,10 @@ func objective() -> String:
 		return "Talk to Merlin"
 	if m1 == "active":
 		return "Find the goblins" if cleared() < ENCOUNTERS.size() else "Return to Merlin"
+	if data["m2"] == "active":
+		return mission2.objective()
+	if data["m2"] == "available":
+		return "Talk to Merlin"
 	return "Mission complete"
 
 
@@ -784,7 +858,11 @@ func hint() -> String:
 		if cleared() < ENCOUNTERS.size():
 			return "Head east past the signpost. Spirit can carry you there fast."
 		return "The goblins are gone. Call Spirit and ride back west to Merlin."
-	return "Talk to Merlin for a practice fight and try your new shield."
+	if data["m2"] == "active":
+		return mission2.hint()
+	if data["m2"] == "available":
+		return "Merlin has a new mission: the rescue of Mom and Dad."
+	return "Your family is home. Race your sister, do her hair, or ride with Spirit."
 
 
 # --- Loop -------------------------------------------------------------------
@@ -972,6 +1050,8 @@ func _camera_target() -> Vector2:
 		x = clampf(x, ride.START_X - 300.0 + view.x / 2.0, ride.START_X + ride.LENGTH + 500.0 - view.x / 2.0)
 		# Follow the hills, looking at the ground a little ahead of Spirit rather than at her jumps.
 		return Vector2(x, ride.ground_y(player.position.x + 140.0) - 0.26 * view.y)
+	elif mission2.on_island:
+		x = clampf(x, mission2.LEFT - 190.0 + view.x / 2.0, mission2.RIGHT - view.x / 2.0)
 	else:
 		x = clampf(x, LEVEL_LEFT + view.x / 2.0, LEVEL_RIGHT - view.x / 2.0)
 	return Vector2(x, GROUND_Y - 0.24 * view.y)
@@ -1023,7 +1103,7 @@ func _process(delta: float) -> void:
 func _draw() -> void:
 	var g := GROUND_Y
 	var left := LEVEL_LEFT - 600.0
-	var width: float = ride.START_X - 1200.0 - left  # the island; the riding course draws its own hills
+	var width: float = ride.START_X - 300.0 - left  # the island; the riding course draws its own hills
 	# Deep soil, then the repeating grass-and-soil strip on top of it.
 	draw_rect(Rect2(left, g + 100.0, width, 700.0), Color(0.33, 0.17, 0.1))
 	var k := GROUND_ART_HEIGHT / ground_art.get_height()

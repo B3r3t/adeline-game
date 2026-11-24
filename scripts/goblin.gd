@@ -50,7 +50,8 @@ var shown_squash := 1.0
 
 # The ogre is a goblin writ large: the same thinking, different drawings and numbers.
 var art := "res://art/goblin"
-var size := 1.0  # how many times bigger than a goblin
+var size := 1.0  # how many times bigger than a goblin: his body, reach and warning marks
+var draw_size := -1.0  # how much to enlarge the drawing; the ogre's is already drawn big
 var tough := false  # shrugs off every hit unless something has its attention
 var dazed := 0.0  # seconds left of being bowled over, or of staring at something else
 var cries := { "attack": "goblin_attack", "hurt": "goblin_hurt", "down": "goblin_down" }
@@ -296,10 +297,11 @@ func _animate() -> void:
 	rig.modulate = tint
 	# Crouching and springing up are eased, not snapped.
 	shown_squash = lerpf(shown_squash, squash, minf(get_physics_process_delta_time() * 18.0, 1.0))
+	var big := draw_size if draw_size > 0.0 else size
 	if signf(rig.scale.x) != float(facing):
-		rig.scale = Vector2(facing, shown_squash) * size
+		rig.scale = Vector2(facing, shown_squash) * big
 		rig.reset_physics_interpolation()
-	rig.scale = Vector2(facing, shown_squash) * size
+	rig.scale = Vector2(facing, shown_squash) * big
 	if state == State.SWING_ACTIVE:
 		rig.sharp["arm"] = true  # the swing has its own timing
 	rig.pose = pose
