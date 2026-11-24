@@ -59,6 +59,22 @@
    "a_lovely.ogg",
    "a_like_it.ogg"
   ],
+  "goodnight": [
+   "a_goodnight.ogg"
+  ],
+  "brush_teeth": [
+   "a_brush_teeth.ogg"
+  ],
+  "all_clean": [
+   "a_all_clean.ogg"
+  ],
+  "sister_hello": [
+   "s_hi.ogg"
+  ],
+  "sister_whee": [
+   "s_whee.ogg",
+   "s_look.ogg"
+  ],
   "goblin_taunt": [
    "g_taunt.ogg",
    "g_nyeh.ogg"
@@ -125,6 +141,9 @@
   ],
   "pop": [
    "pop.ogg"
+  ],
+  "squirt": [
+   "squirt.ogg"
   ]
  },
  "lines": {

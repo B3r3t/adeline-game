@@ -239,6 +239,14 @@ def pop():
     return fade(x + 0.3 * np.sin(4 * np.pi * np.cumsum(f) / SR) * np.exp(-n / 0.04), 0.004, 0.03)
 
 
+def squirt():
+    """Toothpaste coming out of the tube."""
+    n = int(SR * 0.22)
+    x = sweep_noise(0.22, 2600, 900, 0.9) * np.hanning(n) ** 0.6
+    wet = np.sin(2 * np.pi * np.cumsum(300 + 500 * np.linspace(1, 0, n)) / SR) * np.hanning(n) * 0.5
+    return fade(x + wet, 0.01, 0.04)
+
+
 def whinny_fallback():
     """Only used if no recorded whinny is supplied: a bright, falling, quavering call."""
     n = t(1.3)
@@ -306,6 +314,13 @@ ADELINE = {
     "love": ["a_love"],
     "happy": ["a_happy"],
     "lovely": ["a_lovely", "a_like_it"],
+    "goodnight": ["a_goodnight"],
+    "brush_teeth": ["a_brush_teeth"],
+    "all_clean": ["a_all_clean"],
+}
+SISTER = {
+    "sister_hello": ["s_hi"],
+    "sister_whee": ["s_whee", "s_look"],
 }
 GOBLIN = {
     "goblin_taunt": ["g_taunt", "g_nyeh"],
@@ -334,6 +349,9 @@ def main():
             lines[text] = file
     for name, stems in ADELINE.items():
         sounds[name] = [f for f in (recorded(s, level=-17.0) for s in stems) if f]
+    for name, stems in SISTER.items():
+        # The little sister is the same kind of voice pitched a little higher.
+        sounds[name] = [f for f in (recorded(s, pitch=1.1, speed=1.0, level=-17.0) for s in stems) if f]
     for name, stems in GOBLIN.items():
         # Goblins are small and nasty: the recordings are pitched up and hurried a little.
         sounds[name] = [f for f in (recorded(s, pitch=1.32, speed=1.1, level=-18.0) for s in stems) if f]
@@ -356,6 +374,7 @@ def main():
     sounds["munch"] = [save(out, "munch", munch(), 0.75)]
     sounds["brush"] = [save(out, "brush", brush(), 0.5)]
     sounds["pop"] = [save(out, "pop", pop(), 0.6)]
+    sounds["squirt"] = [save(out, "squirt", squirt(), 0.55)]
 
     with open(os.path.join(out, "manifest.json"), "w") as f:
         json.dump({"sounds": sounds, "lines": lines}, f, indent=1)

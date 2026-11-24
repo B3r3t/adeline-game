@@ -382,6 +382,7 @@ func _add_rivals(rng: RandomNumberGenerator) -> void:
 		node.set_script(HorseScript)
 		node.game = game
 		node.wild = true
+		node.tack = false
 		node.subject = who
 		add_child(node)
 		node.state = "mounted"

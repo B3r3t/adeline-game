@@ -12,6 +12,7 @@ const HorseScript := preload("res://scripts/horse.gd")
 const RideScript := preload("res://scripts/ride.gd")
 const SoundScript := preload("res://scripts/sound.gd")
 const IndoorsScript := preload("res://scripts/indoors.gd")
+const SisterScript := preload("res://scripts/sister.gd")
 
 const GROUND_Y := 560.0
 const LEVEL_LEFT := 0.0
@@ -61,6 +62,7 @@ const ENCOUNTERS := [
 
 var player = null
 var horse = null
+var sister = null  # Adeline's little sister, on her pony
 var ride = null  # the riding course
 var sound = null  # voices, grunts and effects
 var sound_on := true
@@ -124,6 +126,11 @@ func _ready() -> void:
 
 	projectiles = Node2D.new()
 	add_child(projectiles)
+
+	sister = Node2D.new()
+	sister.set_script(SisterScript)
+	sister.game = self
+	add_child(sister)
 
 	horse = Node2D.new()
 	horse.set_script(HorseScript)

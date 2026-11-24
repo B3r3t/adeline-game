@@ -69,6 +69,13 @@ The course runs on real physics:
   reached at an easy pace.
 - `scripts/ride.gd` holds all of it. The forces and speeds are at the top.
 
+## Adeline's little sister
+
+Her little sister rides a small cream pony up and down the meadow between the house and the
+signpost, stops for a rest now and then, and waves and calls hello when Adeline comes near.
+Nobody plays her. For now she and her pony are Adeline's and Spirit's drawings made small and
+recoloured (`scripts/sister.gd`); drawings of their own can replace them later.
+
 ## At home
 
 Near the front door a "Go into the house" button appears, and near the stable a "Visit
@@ -91,6 +98,13 @@ Spirit's stable" button.
   away. A touch picks the thing actually touched, not the empty corner of a bigger one.
   Tap the bare floor and Adeline walks there; she also comes over to look at whatever was
   just put down.
+- **The bathroom**, through a second door in the living room. A big mirror shows Adeline's
+  smile with twelve teeth, each with its own grime. Tap the toothpaste to load the brush,
+  then drag the toothbrush over every tooth; a dry brush hardly cleans, and the paste runs
+  out and needs topping up. Teeth get a little grubby again between visits.
+- **Sleeping.** In the bedroom, "Go to sleep" sends Adeline to her bed (the room needs one),
+  where she lies down, the room goes dark and little Z's drift up. A tap wakes her. In the
+  stable, "Bedtime for Spirit" does the same for Spirit, who dozes standing up as horses do.
 - **The stable.** Hold an apple, carrot, hay or oats up to Spirit's mouth to feed her; she
   reaches for it. Her coat has dusty patches, and each one is brushed off where it is.
   Stroke her with the heart to pet her; her neck and face are her favourite places. Anything

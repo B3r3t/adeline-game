@@ -74,7 +74,7 @@ var overlay: Control = null
 var shader: Shader = null
 var textures := {}
 var images := {}
-var home := { "room": [], "bedroom": [], "care": { "food": 0.0, "shine": 0.0, "love": 0.0, "time": 0.0 } }
+var home := { "room": [], "bedroom": [], "teeth": { "clean": 0.0, "time": 0.0 }, "care": { "food": 0.0, "shine": 0.0, "love": 0.0, "time": 0.0 } }
 var clock := 0.0
 var finger := -1
 var note := ""
@@ -110,6 +110,16 @@ var dirt: Array = []  # each: { "node": the patch, "spot": where on her body, "l
 var drops: Array = []  # things let go of, falling into the straw
 var celebrated := false
 
+# Sleeping: 0 awake, 1 on the way to bed, 2 asleep. Adeline sleeps in her bed, Spirit in her stable.
+var sleep := 0
+var night := 0.0  # how dark the room has got, from 0 to 1
+
+# The bathroom: twelve teeth, each with its own grime, and toothpaste on the brush.
+var teeth: Array = []
+var paste := 0.0
+var foam: Array = []  # bubbles: where, and how long each has left
+var teeth_done := true
+
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -127,6 +137,9 @@ func _ready() -> void:
 			if saved.get("care") is Dictionary:
 				for key in home["care"]:
 					home["care"][key] = float(saved["care"].get(key, 0.0))
+			if saved.get("teeth") is Dictionary:
+				for key in home["teeth"]:
+					home["teeth"][key] = float(saved["teeth"].get(key, 0.0))
 
 
 func _save() -> void:
@@ -134,7 +147,13 @@ func _save() -> void:
 		var list: Array = []
 		for thing in things:
 			list.append(thing["data"])
-		home["room" if room == "living" else "bedroom"] = list
+		if room == "bathroom":
+			var grime := 0.0
+			for level in teeth:
+				grime += float(level)
+			home["teeth"] = { "clean": 1.0 - grime / maxf(teeth.size(), 1.0), "time": Time.get_unix_time_from_system() }
+		elif room != "":
+			home["room" if room == "living" else "bedroom"] = list
 	home["care"]["time"] = Time.get_unix_time_from_system()
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file != null:
@@ -143,7 +162,7 @@ func _save() -> void:
 
 func _tex(name: String) -> Texture2D:
 	if not textures.has(name):
-		var ext := "jpg" if name == "room" or name == "stable" or name == "bedroom" else "png"
+		var ext := "jpg" if name == "room" or name == "stable" or name == "bedroom" or name == "bathroom" else "png"
 		textures[name] = load("res://art/room/%s.%s" % [name, ext])
 	return textures[name]
 
@@ -172,6 +191,7 @@ func open(which: String) -> void:
 	close()
 	place = which
 	visible = true
+	finger = -1
 	clock = 0.0
 	note = ""
 	stage = Node2D.new()
@@ -216,6 +236,8 @@ func close() -> void:
 	tool = ""
 	tool_node = null
 	finger = -1
+	sleep = 0
+	night = 0.0
 	place = ""
 	visible = false
 
@@ -226,6 +248,8 @@ func _layout() -> void:
 	stage.scale = Vector2(k, k)
 	# The floor matters most, so the room is lined up along the bottom of the screen.
 	stage.position = Vector2((s.x - ROOM.x * k) / 2.0, s.y - ROOM.y * k)
+	if place == "house" and room == "bathroom":
+		stage.position.y -= TRAY  # the bathroom floor is low in its picture, so the room is lifted clear of the tray
 
 
 func _to_room(screen: Vector2) -> Vector2:
@@ -265,14 +289,20 @@ func _enter_room(which: String) -> void:
 	things.clear()
 	selected = -1
 	dragging = false
+	sleep = 0
+	_drop_tool(false)
 	room = which
-	backdrop.texture = _tex("room" if which == "living" else "bedroom")
+	backdrop.texture = _tex({ "living": "room", "bedroom": "bedroom", "bathroom": "bathroom" }[which])
+	_layout()
 	# She comes in by the door: on the right of the living room, on the left of the bedroom.
 	at = Vector2(_seen().end.x - 190.0 if which == "living" else _seen().position.x + 190.0, _front() - 14.0)
 	goal = at
 	facing = -1 if which == "living" else 1
 	clock = 0.0
 	next_id = 1
+	if which == "bathroom":
+		_open_bathroom()
+		return
 	for data in home["room" if which == "living" else "bedroom"]:
 		if not (data is Dictionary) or _named(str(data.get("t", ""))).is_empty():
 			continue
@@ -289,9 +319,202 @@ func _enter_room(which: String) -> void:
 		_refresh(i)
 
 
-## The things that can be put in the room she is in.
+## The things that can be put in the room she is in. Nothing is put in the bathroom.
 func _list() -> Array:
+	if room == "bathroom":
+		return []
 	return FURNITURE if room == "living" else BEDROOM
+
+
+## What the strip along the bottom shows.
+func _tray_name(i: int) -> String:
+	if place == "stable":
+		return str(CARE[i][0])
+	return ["toothpaste", "toothbrush"][i] if room == "bathroom" else str(_list()[i][0])
+
+
+## The doors out of the room she is in: where the button is, where it leads, what it says.
+func _doors() -> Array:
+	var s := get_viewport_rect().size
+	var left := Rect2(24.0, 124.0, 212.0, 52.0)
+	var right := Rect2(s.x - 236.0, 124.0, 212.0, 52.0)
+	match room:
+		"living":
+			return [[right, "bedroom", "To the bedroom"], [left, "bathroom", "To the bathroom"]]
+		"bedroom":
+			return [[left, "living", "To the living room"]]
+	return [[right, "living", "To the living room"]]
+
+
+## The button for going to sleep and waking up: in the bedroom, and in the stable for Spirit.
+func _sleep_rect() -> Rect2:
+	return Rect2(get_viewport_rect().size.x - 236.0, 124.0, 212.0, 52.0)
+
+
+func _bed() -> int:
+	for i in things.size():
+		if things[i]["data"]["t"] == "bed":
+			return i
+	return -1
+
+
+func _toggle_sleep() -> void:
+	if sleep > 0:
+		# Waking up.
+		if place == "house" and sleep == 2 and _bed() >= 0:
+			var bed: Dictionary = things[_bed()]["data"]
+			at = Vector2(clampf(float(bed["x"]) + _half_width(_bed()) + 70.0, 120.0, ROOM.x - 120.0), clampf(float(bed["y"]) + 6.0, BACK + 24.0, _front()))
+			goal = at
+		sleep = 0
+		game.sound.play("pop", -6.0)
+		return
+	if place == "stable":
+		_drop_tool(false)
+		sleep = 2
+		game.sound.shout("adeline", "goodnight", 1.0, true)
+		game.sound.play("snort", -8.0)
+		return
+	if _bed() < 0:
+		_say("Put a bed in the room first.")
+		return
+	selected = -1
+	sleep = 1
+	var bed: Dictionary = things[_bed()]["data"]
+	goal = Vector2(float(bed["x"]), clampf(float(bed["y"]) + 6.0, BACK + 24.0, _front()))
+
+
+# --- The bathroom ------------------------------------------------------------
+
+func _open_bathroom() -> void:
+	at = Vector2(_to_room(Vector2(150.0, 0.0)).x, 712.0)  # beside the mirror, where she can be seen
+	goal = at
+	facing = 1
+	paste = 0.0
+	foam.clear()
+	# Teeth get a little grubby again between visits.
+	var saved: Dictionary = home["teeth"]
+	var away := maxf(Time.get_unix_time_from_system() - float(saved["time"]), 0.0) if float(saved["time"]) > 0.0 else 99999.0
+	var grime := clampf(1.0 - float(saved["clean"]) + away / 1500.0, 0.0, 1.0)
+	teeth.clear()
+	for i in 12:
+		teeth.append(clampf(grime * randf_range(0.75, 1.0), 0.0, 1.0))
+	teeth_done = grime < 0.02
+	if not teeth_done:
+		game.sound.shout("adeline", "brush_teeth", 1.0, true)
+
+
+## Where the big mirror is drawn on screen, and the twelve teeth in it.
+func _mirror() -> Rect2:
+	var s := get_viewport_rect().size
+	var size := Vector2(minf(660.0, s.x * 0.52), minf(400.0, (s.y - TRAY) * 0.6))
+	return Rect2(Vector2(s.x / 2.0 - size.x / 2.0, 150.0), size)
+
+
+func _tooth(i: int) -> Rect2:
+	var m := _mirror()
+	var w := m.size.x * 0.105
+	var upper := i < 6
+	var col := i % 6
+	var h := m.size.y * (0.2 if upper else 0.16)
+	# The middle teeth are a little bigger, as real front teeth are.
+	var grow := 1.0 + 0.12 * (1.0 - absf(col - 2.5) / 2.5)
+	var x := m.get_center().x + (col - 3) * w * 1.04
+	var y := m.get_center().y + (m.size.y * 0.02 - h * grow if upper else m.size.y * 0.06)
+	return Rect2(x, y, w, h * grow)
+
+
+## The end of the brush that does the work, on screen.
+func _bristles() -> Vector2:
+	return _to_screen(tool_node.position + Vector2(92.0, -22.0) * tool_node.scale.x)
+
+
+func _brush_teeth(moved: float) -> void:
+	if moved <= 0.0:
+		return
+	var tip := _bristles()
+	var touched := false
+	for i in teeth.size():
+		if _tooth(i).grow(10.0).has_point(tip):
+			touched = true
+	# Only scrubbing counts: the brush has to be on the teeth before and after it moves.
+	var scrub := minf(moved, 40.0) if touched and on_her else 0.0
+	on_her = touched
+	if scrub <= 0.0:
+		return
+	moved = scrub
+	for i in teeth.size():
+		if _tooth(i).grow(10.0).has_point(tip) and float(teeth[i]) > 0.0:
+			# Toothpaste does the work. A dry brush hardly helps.
+			teeth[i] = maxf(float(teeth[i]) - moved / (150.0 if paste > 0.0 else 6000.0), 0.0)
+	if paste > 0.0:
+		paste = maxf(paste - moved / 2600.0, 0.0)
+		if int((stroke + moved) / 26.0) != int(stroke / 26.0):
+			foam.append([tip + Vector2(randf_range(-22.0, 22.0), randf_range(-16.0, 16.0)), randf_range(0.5, 1.0)])
+		if int((stroke + moved) / 150.0) != int(stroke / 150.0):
+			game.sound.play("brush", -4.0, 0.15, 1.3)
+	elif note_time <= 0.0:
+		_say("Tap the toothpaste first.")
+	stroke += moved
+	if not teeth_done:
+		var grime := 0.0
+		for level in teeth:
+			grime += float(level)
+		if grime <= 0.0:
+			teeth_done = true
+			_say("Sparkling!")
+			game.sound.play("chime", -3.0, 0.0, 1.2)
+			game.sound.play("fanfare", -7.0, 0.0)
+			game.sound.shout("adeline", "all_clean", 1.0, true)
+			_save()
+
+
+func _draw_bathroom(s: Vector2) -> void:
+	var m := _mirror()
+	var c := m.get_center()
+	# The mirror, with Adeline's smile in it.
+	var rim := PackedVector2Array()
+	var glass := PackedVector2Array()
+	for k in 48:
+		var a := TAU * k / 48.0
+		rim.append(c + Vector2(cos(a) * (m.size.x / 2.0 + 16.0), sin(a) * (m.size.y / 2.0 + 16.0)))
+		glass.append(c + Vector2(cos(a) * m.size.x / 2.0, sin(a) * m.size.y / 2.0))
+	overlay.draw_colored_polygon(rim, Color(0.85, 0.6, 0.2))
+	overlay.draw_colored_polygon(glass, Color(0.99, 0.82, 0.7))
+	overlay.draw_polyline(rim + PackedVector2Array([rim[0]]), Color(0.2, 0.12, 0.05), 4.0)
+	overlay.draw_circle(c + Vector2(-m.size.x * 0.33, -m.size.y * 0.08), m.size.y * 0.1, Color(1.0, 0.6, 0.6, 0.45))
+	overlay.draw_circle(c + Vector2(m.size.x * 0.33, -m.size.y * 0.08), m.size.y * 0.1, Color(1.0, 0.6, 0.6, 0.45))
+	overlay.draw_arc(c + Vector2(0.0, -m.size.y * 0.36), m.size.y * 0.06, 0.3, PI - 0.3, 12, Color(0.75, 0.5, 0.4), 4.0)
+	var mouth := PackedVector2Array()
+	for k in 40:
+		var a := TAU * k / 40.0
+		mouth.append(c + Vector2(cos(a) * m.size.x * 0.36, m.size.y * 0.04 + sin(a) * m.size.y * 0.27))
+	overlay.draw_colored_polygon(mouth, Color(0.45, 0.1, 0.14))
+	overlay.draw_polyline(mouth + PackedVector2Array([mouth[0]]), Color(0.85, 0.25, 0.3), 9.0)
+	for i in teeth.size():
+		var t := _tooth(i)
+		overlay.draw_rect(t, Color.WHITE)
+		var grime: float = teeth[i]
+		if grime > 0.0:
+			overlay.draw_rect(t, Color(0.86, 0.74, 0.25, grime * 0.8))
+			if grime > 0.45:
+				overlay.draw_circle(t.position + t.size * Vector2(0.3, 0.4), t.size.x * 0.12, Color(0.5, 0.36, 0.12, grime * 0.8))
+				overlay.draw_circle(t.position + t.size * Vector2(0.68, 0.66), t.size.x * 0.09, Color(0.5, 0.36, 0.12, grime * 0.8))
+		elif int(clock * 2.0 + i * 0.37) % 5 == 0:
+			var p := t.position + t.size * Vector2(0.7, 0.28)
+			overlay.draw_line(p + Vector2(-7.0, 0.0), p + Vector2(7.0, 0.0), Color(0.6, 0.9, 1.0), 2.0)
+			overlay.draw_line(p + Vector2(0.0, -7.0), p + Vector2(0.0, 7.0), Color(0.6, 0.9, 1.0), 2.0)
+		overlay.draw_rect(t, Color(0.25, 0.2, 0.25), false, 2.0)
+	for bubble in foam:
+		overlay.draw_circle(bubble[0], 5.0 + 9.0 * float(bubble[1]), Color(1.0, 1.0, 1.0, 0.75 * float(bubble[1])))
+	# Toothpaste on the brush.
+	if tool_node != null and paste > 0.0:
+		overlay.draw_circle(_bristles() + Vector2(0.0, -10.0), 6.0 + 9.0 * paste, Color(0.7, 0.95, 1.0))
+		overlay.draw_circle(_bristles() + Vector2(0.0, -10.0), 6.0 + 9.0 * paste, Color(0.2, 0.4, 0.6), false, 2.0)
+	if paste > 0.0:
+		var cell := _cell_rect(1)
+		overlay.draw_circle(cell.position + Vector2(cell.size.x * 0.76, cell.size.y * 0.3), 8.0, Color(0.7, 0.95, 1.0))
+	if clock < 10.0 and not teeth_done:
+		_text(Vector2(0.0, 132.0), "Tap the toothpaste, then drag the toothbrush over every tooth.", 22, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
 
 
 ## What is known about a kind of furniture, from either room's list.
@@ -743,6 +966,9 @@ func _stable_frame(delta: float) -> void:
 	var pose := { "tail": sin(clock * 2.0) * 6.0 + (22.0 if hop > 0.0 else 0.0), "body": sin(clock * 1.3) * 1.0 + lean * 7.0 }
 	if munch > 0.0:
 		pose["body"] = 9.0 + sin(clock * 16.0) * 3.0  # head down, chewing
+	if sleep == 2:
+		# Horses doze standing up, head low and tail still.
+		pose = { "tail": 0.0, "body": 8.0 + sin(clock * 1.1) * 0.8 }
 	spirit.pose = pose
 	spirit.root_offset = Vector2(lean * 2.0, -absf(sin(clock * 11.0)) * 8.0 if hop > 0.0 else 0.0)
 	spirit.apply()
@@ -784,6 +1010,10 @@ func _process(delta: float) -> void:
 	clock += delta
 	note_time = maxf(note_time - delta, 0.0)
 	_layout()
+	night = move_toward(night, 1.0 if sleep == 2 else 0.0, delta * 1.6)
+	for bubble in foam:
+		bubble[1] = float(bubble[1]) - delta * 1.1
+	foam = foam.filter(func(b): return float(b[1]) > 0.0)
 	if place == "house":
 		_fall(delta)
 	else:
@@ -817,10 +1047,28 @@ func _animate_adeline(delta: float) -> void:
 			pose["arm_upper"] = -78.0 + sin(clock * 7.0) * 8.0
 			pose["arm_lower"] = -18.0
 			pose["torso"] = 5.0
+	if place == "house" and sleep == 1 and to.length() <= 5.0:
+		sleep = 2  # she has reached her bed
+		game.sound.shout("adeline", "goodnight", 1.0, true)
+	var size := 2.3 * (_depth(at.y) if place == "house" else 1.0)
+	adeline.root_angle = 0.0
+	if place == "house" and sleep == 2 and _bed() >= 0:
+		# Lying on her bed, head on the pillow, breathing slowly.
+		var bed := _bed()
+		var flipped := bool(things[bed]["data"]["f"])
+		facing = -1 if flipped else 1
+		adeline.pose = { "arm_upper": 12.0, "arm_lower": 6.0, "torso": sin(clock * 1.4) * 1.2, "cloak_back": 0.0 }
+		adeline.root_angle = -PI / 2.0
+		adeline.root_offset = -adeline.rest_pos("torso")
+		adeline.apply()
+		size = 2.3 * _depth(float(things[bed]["data"]["y"])) * 0.92
+		adeline.position = Vector2(float(things[bed]["data"]["x"]) + (20.0 if flipped else -20.0), _top(bed) - 14.0)
+		adeline.scale = Vector2(size * facing, size)
+		adeline.z_index = things[bed]["node"].z_index + 2
+		return
 	adeline.pose = pose
 	adeline.root_offset = Vector2(0.0, lift)
 	adeline.apply()
-	var size := 2.3 * (_depth(at.y) if place == "house" else 1.0)
 	adeline.position = at
 	adeline.scale = Vector2(size * facing, size)
 	adeline.z_index = int(at.y)
@@ -837,7 +1085,8 @@ func _input(event: InputEvent) -> void:
 				return
 			if not _press(event.position):
 				return  # not ours: let the Home button have it
-			finger = event.index
+			# If that touch took her back outside, there is no finger left to follow.
+			finger = event.index if place != "" else -1
 		elif event.index == finger:
 			_release()
 			finger = -1
@@ -861,9 +1110,28 @@ func _press(pos: Vector2) -> bool:
 			cell = i
 	var spot := _to_room(pos)
 	if place == "house":
-		if _room_rect().has_point(pos):
-			_enter_room("bedroom" if room == "living" else "living")
-			game.sound.play("thump", -8.0)
+		for door in _doors():
+			if (door[0] as Rect2).has_point(pos):
+				_enter_room(str(door[1]))
+				game.sound.play("thump", -8.0)
+				return true
+		if room == "bedroom" and (_sleep_rect().has_point(pos) or sleep > 0):
+			_toggle_sleep()  # the button, or a tap anywhere to wake her
+		elif room == "bathroom":
+			if cell == 0:
+				paste = 1.0
+				game.sound.play("squirt", -3.0, 0.08)
+			elif cell == 1:
+				tool = "toothbrush"
+				tool_node = Sprite2D.new()
+				tool_node.texture = _tex("toothbrush")
+				tool_node.scale = Vector2(0.8, 0.8)
+				tool_node.z_index = 3500
+				stage.add_child(tool_node)
+				tool_node.position = _tool_spot(pos)
+				last_touch = tool_node.position
+				stroke = 0.0
+				on_her = false
 		elif cell >= 0:
 			_add(cell)
 		elif selected >= 0 and _bar_press(pos):
@@ -880,7 +1148,11 @@ func _press(pos: Vector2) -> bool:
 			elif spot.y > BACK - 30.0:
 				_walk_to(spot)  # a tap on the bare floor: Adeline walks there
 	else:
-		if cell >= 0:
+		if _sleep_rect().has_point(pos) or (sleep > 0 and _touching(spot)):
+			_toggle_sleep()
+		elif sleep > 0:
+			_say("Shh. Spirit is asleep.")
+		elif cell >= 0:
 			_pick_tool(cell, pos)
 		elif _touching(spot):
 			_pet(spot, 0.12)
@@ -891,6 +1163,12 @@ func _move(pos: Vector2) -> void:
 	if place == "house":
 		if dragging and selected >= 0:
 			_hold(_to_room(pos) + grab)
+		elif tool == "toothbrush" and tool_node != null:
+			var spot := _tool_spot(pos)
+			var moved: float = spot.distance_to(last_touch) * stage.scale.x
+			tool_node.position = spot
+			last_touch = spot
+			_brush_teeth(moved)
 	elif tool != "" and tool_node != null:
 		tool_node.position = _tool_spot(pos)
 		_use_tool(tool_node.position)
@@ -902,6 +1180,9 @@ func _release() -> void:
 			dragging = false
 			_let_go()
 		dragging = false
+		if tool == "toothbrush":
+			_drop_tool(false)
+			_save()
 	else:
 		_drop_tool()
 		_save()
@@ -945,7 +1226,9 @@ func _bar_press(pos: Vector2) -> bool:
 # --- What is on screen besides the room ---------------------------------------
 
 func _tray_count() -> int:
-	return _list().size() if place == "house" else CARE.size()
+	if place == "stable":
+		return CARE.size()
+	return 2 if room == "bathroom" else _list().size()
 
 
 func _cell_rect(i: int) -> Rect2:
@@ -995,10 +1278,18 @@ func _draw_ui() -> void:
 	if place == "" or stage == null:
 		return
 	var s := get_viewport_rect().size
+	if night > 0.0:
+		# Night falls over the room, and little Z's drift up from the sleeper.
+		overlay.draw_rect(Rect2(Vector2.ZERO, s), Color(0.03, 0.05, 0.2, 0.6 * night))
+		if sleep == 2:
+			var head := _to_screen(_on_spirit(Vector2(236.0, 24.0))) if place == "stable" else _to_screen(adeline.position + Vector2(-150.0 * facing, -70.0))
+			for i in 3:
+				var k := fmod(clock * 0.45 + i / 3.0, 1.0)
+				_text(head + Vector2(26.0 * k + 12.0 * sin(k * 6.0), -30.0 - 110.0 * k), "z", int(22.0 + 26.0 * k), Color(1.0, 1.0, 1.0, 1.0 - k))
 	overlay.draw_rect(Rect2(0.0, s.y - TRAY, s.x, TRAY), Color(0.12, 0.08, 0.06, 0.86))
 	for i in _tray_count():
 		var r := _cell_rect(i)
-		var name: String = _list()[i][0] if place == "house" else CARE[i][0]
+		var name := _tray_name(i)
 		overlay.draw_rect(r, Color(1.0, 0.95, 0.85, 0.3 if name == tool else 0.13))
 		_fit(_tex(name), r)
 	_button(_back_rect(), "Back outside", 22, Color(0.08, 0.1, 0.2, 0.6))
@@ -1011,7 +1302,15 @@ func _draw_ui() -> void:
 
 
 func _draw_house(s: Vector2) -> void:
-	_button(_room_rect(), "To the bedroom" if room == "living" else "To the living room", 20, Color(0.3, 0.6, 0.35, 0.9))
+	for door in _doors():
+		_button(door[0], str(door[2]), 20, Color(0.3, 0.6, 0.35, 0.9))
+	if room == "bathroom":
+		_draw_bathroom(s)
+		return
+	if room == "bedroom":
+		_button(_sleep_rect(), "Wake up" if sleep > 0 else "Go to sleep", 20, Color(0.3, 0.3, 0.7, 0.9))
+	if sleep > 0:
+		return
 	if things.is_empty():
 		_text(Vector2(0.0, 216.0), "Tap something below to put it in the room.", 26, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
 	elif selected < 0 and clock < 7.0:
@@ -1033,6 +1332,7 @@ func _draw_house(s: Vector2) -> void:
 
 
 func _draw_stable(s: Vector2) -> void:
+	_button(_sleep_rect(), "Wake Spirit" if sleep > 0 else "Bedtime for Spirit", 20, Color(0.3, 0.3, 0.7, 0.9))
 	var care: Dictionary = home["care"]
 	var names := [["Food", "food", "apple"], ["Shine", "shine", "brush"], ["Love", "love", "heart"]]
 	var width := 210.0
@@ -1045,5 +1345,5 @@ func _draw_stable(s: Vector2) -> void:
 		overlay.draw_rect(Rect2(bar.position, Vector2(bar.size.x * float(care[names[i][1]]), bar.size.y)), Color(1.0, 0.8, 0.25))
 		overlay.draw_rect(bar, Color(1.0, 1.0, 1.0, 0.7), false, 2.0)
 		_text(Vector2(x + 50.0, 104.0), str(names[i][0]), 18, Color.WHITE)
-	if clock < 10.0 and not _all_full():
-		_text(Vector2(0.0, 150.0), "Hold food up to Spirit's mouth. Brush every dusty patch. Stroke her with the heart.", 22, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
+	if clock < 10.0 and not _all_full() and sleep == 0:
+		_text(Vector2(0.0, 214.0), "Hold food up to Spirit's mouth. Brush every dusty patch. Stroke her with the heart.", 22, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)

@@ -21,7 +21,8 @@ var rig = null
 var rider = null  # a second copy of Adeline's rig that shows only her near leg
 var saddle: Sprite2D = null
 var subject = null  # whoever this horse carries; Adeline unless told otherwise
-var wild := false  # a horse with no saddle and no rider, run by the race
+var wild := false  # a horse moved by something other than Adeline: a race, or her sister
+var tack := true  # whether it wears a saddle and reins
 
 # Recolours a horse's coat: how grey it goes, what colour it is washed with, how bright.
 const COAT_SHADER := "
@@ -243,10 +244,10 @@ func _body_point(pixel: Vector2) -> Vector2:
 ## Keeps the saddle on her back and hangs the reins from the bit: to Adeline's hands
 ## while she rides, and looped back to the saddle when she does not.
 func _tack() -> void:
-	saddle.visible = not wild
+	saddle.visible = tack
 	for line in reins:
-		line.visible = not wild
-	if wild:
+		line.visible = tack
+	if not tack:
 		return
 	var body: Sprite2D = rig.info["body"]["sprite"]
 	saddle.position = body.position

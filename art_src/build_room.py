@@ -11,10 +11,11 @@ SHEETS = {
     "care": ["apple", "carrot", "brush", "hay", "heart", "oats"],
     "bed_a": ["bed", "wardrobe", "nightstand", "mirror", "desk", "chest"],
     "bed_b": ["heart_rug", "bedside_lamp", "teddy", "toy_horse", "poster", "bunting"],
+    "bath_a": ["duck", "cup", "toothbrush", "toothpaste"],
 }
 src, out = sys.argv[1], sys.argv[2]
 os.makedirs(out, exist_ok=True)
-for name in ["room", "stable", "bedroom"]:
+for name in ["room", "stable", "bedroom", "bathroom"]:
     Image.open(os.path.join(src, name + "_src.png")).convert("RGB").save(os.path.join(out, name + ".jpg"), quality=90)
 for sheet, names in SHEETS.items():
     im = Image.open(os.path.join(src, sheet + ".png")).convert("RGBA")
