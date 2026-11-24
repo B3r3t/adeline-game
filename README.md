@@ -165,6 +165,11 @@ Every change pushed to `main` is built automatically. The Releases page always h
 How updating stays safe
 
 - A download that arrives cut short is thrown away.
+- A file the game has loaded is never changed while the game is running. The game reads its
+  pictures out of that file as it needs them, so swapping it mid-play breaks whatever has not
+  been read yet (builds 16 to 20 did this: rooms and race pieces went missing until the game
+  was reopened). A download is now kept as `update_new`, becomes `update_next` at the next
+  start, and is loaded on top by `scripts/handoff.gd` before any game code is read.
 - If the game fails to start with a new update, the next start throws that update away and
   runs the installed version.
 - Some changes cannot arrive as an update: a new Godot version or a change in `project.godot`.
@@ -180,6 +185,8 @@ How movement stays smooth
 ## Project layout
 
 - `scripts/boot.gd` runs first and loads a downloaded update if there is one.
+- `scripts/handoff.gd` (the scene `main.tscn`) runs next and loads the newest update on top.
+  The game itself is the scene `game.tscn`.
 - `scripts/main.gd` builds the island, runs the mission, fights, saving and the update check.
 - `scripts/player.gd` is Adeline. Her speeds, reach and timings are at the top of the file.
 - `scripts/goblin.gd` is the goblin and its two attacks, with timings at the top.

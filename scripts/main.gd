@@ -374,39 +374,42 @@ func _on_update_info(result: int, code: int, _headers: PackedStringArray, body: 
 	if int(Engine.get_meta("installed_build", 0)) < int(info.get("min_app_build", 0)):
 		update_note = "A new version is out. Install it from the download page."
 		return
-	if FileAccess.file_exists("user://update.json"):
-		var have = JSON.parse_string(FileAccess.get_file_as_string("user://update.json"))
+	if FileAccess.file_exists("user://update_new.json"):
+		var have = JSON.parse_string(FileAccess.get_file_as_string("user://update_new.json"))
 		if have is Dictionary and int(have.get("build", 0)) >= latest:
-			update_note = "Update ready. Close and reopen the game to play it."
+			update_note = "Update ready. It will be here next time you open the game."
 			return
 	update_note = "Downloading an update..."
 	var dl := HTTPRequest.new()
 	add_child(dl)
-	dl.download_file = "user://update.tmp"
+	dl.download_file = "user://update_new.tmp"
 	dl.request_completed.connect(_on_update_pack.bind(dl, latest, int(info.get("size", 0))))
 	if dl.request(_update_url() + "adeline.pck") != OK:
 		dl.queue_free()
 		update_note = ""
 
 
+## The download is kept under its own name and is only put to use at the next start (see
+## handoff.gd). The files the game is running from are never touched while it runs.
 func _on_update_pack(result: int, code: int, _headers: PackedStringArray, _body: PackedByteArray, dl: HTTPRequest, latest: int, size: int) -> void:
 	dl.queue_free()
 	var dir := DirAccess.open("user://")
 	var good := result == HTTPRequest.RESULT_SUCCESS and code == 200 and dir != null
 	if good and size > 0:
-		var file := FileAccess.open("user://update.tmp", FileAccess.READ)
+		var file := FileAccess.open("user://update_new.tmp", FileAccess.READ)
 		good = file != null and file.get_length() == size  # a cut-off download is thrown away
 	if not good:
 		update_note = ""
-		if dir != null and dir.file_exists("update.tmp"):
-			dir.remove("update.tmp")
+		if dir != null and dir.file_exists("update_new.tmp"):
+			dir.remove("update_new.tmp")
 		return
-	if dir.file_exists("update.pck"):
-		dir.remove("update.pck")
-	dir.rename("update.tmp", "update.pck")
-	var note := FileAccess.open("user://update.json", FileAccess.WRITE)
+	for old in ["update_new.pck", "update_new.json"]:
+		if dir.file_exists(old):
+			dir.remove(old)
+	dir.rename("update_new.tmp", "update_new.pck")
+	var note := FileAccess.open("user://update_new.json", FileAccess.WRITE)
 	note.store_string(JSON.stringify({ "build": latest }))
-	update_note = "Update ready. Close and reopen the game to play it."
+	update_note = "Update ready. It will be here next time you open the game."
 
 
 # --- Starting and placing ---------------------------------------------------
@@ -965,8 +968,9 @@ func _process(delta: float) -> void:
 	if not guard_cleared and clock > 3.0:
 		# The game has been running fine for a few seconds, so any update just loaded is good.
 		guard_cleared = true
-		if FileAccess.file_exists("user://update_loading"):
-			DirAccess.remove_absolute(ProjectSettings.globalize_path("user://update_loading"))
+		for guard in ["user://update_loading", "user://update_next_loading"]:
+			if FileAccess.file_exists(guard):
+				DirAccess.remove_absolute(ProjectSettings.globalize_path(guard))
 	toast_time = maxf(toast_time - delta, 0.0)
 	goblins = goblins.filter(func(g): return is_instance_valid(g))
 	# Merlin turns to face Adeline. A goblin camp packs up once its goblins are beaten.
