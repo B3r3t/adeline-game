@@ -58,6 +58,11 @@ void fragment() {
 	COLOR = c;
 }
 "
+# Her hairstyles. Each is a picture that takes the place of her ponytail (art_src/build_hair.py).
+const HAIR := ["ponytail", "braid", "bun", "pigtails"]
+const HAIR_SAYS := ["A ponytail", "A braid", "A bun", "Pigtails"]
+static var hair_specs := {}
+var hair := 0
 var activity := ""  # count, race, cheer, regroup or hair; empty when she is just being herself
 var on_foot := false
 var pony_x := 0.0
@@ -238,6 +243,20 @@ func do_hair() -> void:
 	p.reset_physics_interpolation()
 
 
+## Puts a hairstyle on a sister rig: this one outdoors, or the one in the house.
+static func wear_hair(on, n: int) -> void:
+	if hair_specs.is_empty():
+		hair_specs = JSON.parse_string(FileAccess.get_file_as_string("res://art/sister/hair.json"))
+	var style: String = HAIR[posmod(n, HAIR.size())]
+	var spec: Dictionary = hair_specs[style]
+	on.swap("ponytail", load("res://art/sister/hair_%s.png" % style), Vector2(spec["pivot"][0], spec["pivot"][1]), Vector2(spec["pos"][0], spec["pos"][1]), float(spec["soft"]))
+
+
+func set_hair(n: int) -> void:
+	hair = posmod(n, HAIR.size())
+	wear_hair(girl, hair)
+
+
 func set_ribbon(n: int) -> void:
 	ribbon = posmod(n, RIBBONS.size())
 	ribbon_look.set_shader_parameter("shift", float(RIBBONS[ribbon][1]))
@@ -300,10 +319,10 @@ func _play(delta: float) -> void:
 				shown = strokes
 				game.sound.play("brush", -5.0, 0.1)
 			if timer <= 0.0:
-				set_ribbon(ribbon + 1)
-				game.data["ribbon"] = ribbon
+				set_hair(hair + 1)
+				game.data["hair"] = hair
 				game._save()
-				game.toast("A %s ribbon! She loves it." % RIBBONS[ribbon][0])
+				game.toast("%s! She loves it." % HAIR_SAYS[hair])
 				game.sound.play("chime", -5.0)
 				game.sound.shout("sister", "sister_love", 1.0, true)
 				hop = 0.8
@@ -373,4 +392,5 @@ func reset() -> void:
 	on_foot = false
 	hop = 0.0
 	set_ribbon(int(game.data.get("ribbon", 0)))
+	set_hair(int(game.data.get("hair", 0)))
 	roam()

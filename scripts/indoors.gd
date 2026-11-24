@@ -14,6 +14,7 @@ extends Control
 ## room is scaled to fill whatever screen it is on.
 
 const RigScript := preload("res://scripts/rig.gd")
+const PlaymateScript := preload("res://scripts/playmate.gd")
 const Moves := preload("res://scripts/moves.gd")
 
 const ROOM := Vector2(1344.0, 752.0)
@@ -83,6 +84,7 @@ var note_time := 0.0
 
 # Adeline, who walks about in both rooms.
 var adeline = null
+var playmate = null  # her little sister, when she is in the house
 var at := Vector2.ZERO  # where her feet are
 var goal := Vector2.ZERO
 var facing := 1
@@ -136,6 +138,11 @@ func _ready() -> void:
 	visible = false
 	shader = Shader.new()
 	shader.code = HUE_SHADER
+	playmate = Node.new()
+	playmate.set_script(PlaymateScript)
+	playmate.inn = self
+	playmate.game = game
+	add_child(playmate)
 	if FileAccess.file_exists(SAVE_PATH):
 		var saved = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 		if saved is Dictionary:
@@ -145,6 +152,7 @@ func _ready() -> void:
 			if saved.get("care") is Dictionary:
 				for key in home["care"]:
 					home["care"][key] = float(saved["care"].get(key, 0.0))
+			home["balloon"] = int(saved.get("balloon", 0))
 			if saved.get("teeth") is Dictionary:
 				for key in home["teeth"]:
 					home["teeth"][key] = float(saved["teeth"].get(key, 0.0))
@@ -218,6 +226,7 @@ func open(which: String) -> void:
 	adeline.build("res://art/adeline")
 	_layout()
 	if which == "house":
+		playmate.opened()
 		_open_house()
 	else:
 		_open_stable()
@@ -247,6 +256,7 @@ func close() -> void:
 	mouth = null
 	place = ""
 	visible = false
+	playmate.closed()
 
 
 func _layout() -> void:
@@ -311,6 +321,7 @@ func _enter_room(which: String) -> void:
 	facing = -1 if which == "living" else 1
 	clock = 0.0
 	next_id = 1
+	playmate.entered_room()
 	if which == "bathroom":
 		_open_bathroom()
 		return
@@ -1094,6 +1105,8 @@ func _process(delta: float) -> void:
 	else:
 		_stable_frame(delta)
 	_animate_adeline(delta)
+	if place == "house":
+		playmate.frame(delta)
 	overlay.queue_redraw()
 
 
@@ -1363,6 +1376,7 @@ func _draw_ui() -> void:
 	_button(_back_rect(), "Back outside", 22, Color(0.08, 0.1, 0.2, 0.6))
 	if place == "house":
 		_draw_house(s)
+		playmate.draw_ui(s)
 	else:
 		_draw_stable(s)
 	if note_time > 0.0:
@@ -1379,6 +1393,8 @@ func _draw_house(s: Vector2) -> void:
 		_button(_sleep_rect(), "Wake up" if sleep > 0 else "Go to sleep", 20, Color(0.3, 0.3, 0.7, 0.9))
 	if sleep > 0:
 		return
+	if playmate.play != "":
+		return  # a game with her sister is on: the room's own hints and buttons wait
 	if things.is_empty():
 		_text(Vector2(0.0, 216.0), "Tap something below to put it in the room.", 26, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
 	elif selected < 0 and clock < 7.0:

@@ -105,6 +105,25 @@ func _strips(tex: Texture2D, how: Dictionary, pivot: Vector2) -> Polygon2D:
 	return poly
 
 
+## Gives a part a different picture: another hairstyle, say. `soft` scales how much it
+## bends and ripples, for pictures that should hold their shape (a bun).
+func swap(part: String, tex: Texture2D, pivot: Vector2, pos: Vector2, soft := 1.0) -> void:
+	var d: Dictionary = info[part]
+	d["pos"] = pos
+	d["pivot"] = pivot
+	d["soft"] = soft
+	var node = d["sprite"]
+	node.texture = tex
+	node.offset = -pivot
+	if node is Polygon2D:
+		var fresh := _strips(tex, bends[part], pivot)
+		node.polygon = fresh.polygon
+		node.uv = fresh.uv
+		node.polygons = fresh.polygons
+		d["shape"] = fresh.polygon
+		fresh.free()
+
+
 ## Bends a soft part: each strip is turned about the bend's centre by its share of `turn`
 ## (degrees), plus a ripple that runs down it.
 func _bend(part: String, turn: float, ripple: float) -> void:
@@ -178,7 +197,8 @@ func apply(delta := -1.0) -> void:
 		if bends.has(part) and not bends[part].has("at"):
 			# A soft part: a share of the swing at the joint, the rest as a curl toward the tip.
 			var how: Dictionary = bends[part]
-			_bend(part, now * float(how["curl"]), float(how["flutter"]) * (1.4 + 6.0 * wind))
+			var soft := float(d.get("soft", 1.0))
+			_bend(part, now * float(how["curl"]) * soft, float(how["flutter"]) * (1.4 + 6.0 * wind) * soft)
 			now *= float(how["root"])
 		elif bends.has(part):
 			# A part with a bending place of its own (a neck), asked for by name in the pose.

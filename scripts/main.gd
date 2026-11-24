@@ -300,7 +300,7 @@ func _add_wall(rect: Rect2) -> void:
 # --- Saved progress ---------------------------------------------------------
 
 func _default_data() -> Dictionary:
-	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "m2": "available", "m2_step": 0, "m2_thanked": false }
+	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "hair": 0, "m2": "available", "m2_step": 0, "m2_thanked": false }
 
 
 func has_save() -> bool:

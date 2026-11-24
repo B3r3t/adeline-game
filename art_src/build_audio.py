@@ -342,6 +342,9 @@ SISTER = {
     "sister_charge": ["s_charge"],
     "sister_stay": ["s_stay"],
     "sister_family": ["s_family"],
+    "sister_balloon": ["s_balloon"],
+    "sister_again": ["s_again"],
+    "sister_pretty": ["s_pretty"],
 }
 OGRE = {
     "ogre_roar": ["o_roar"],

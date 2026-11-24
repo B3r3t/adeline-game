@@ -105,10 +105,25 @@ cloak), so they look like sisters. Walk up to her and tap SISTER for things to d
 
 - Race you on foot: she hops off her pony, they line up, 3-2-1-GO, first past the flag.
   She runs a little slower than Adeline, so it is close but winnable.
-- Do her hair: a brush, some sparkles, and her ribbon changes to the next of six colours.
-  The colour is remembered.
+- Do her hair: a brush, some sparkles, and the next of her four hairstyles (ponytail,
+  braid, bun, pigtails). It is remembered.
 - Come with me / Off you go and play: she rides along behind Adeline, or goes back to
   wandering.
+
+### Indoors together
+
+Her sister comes into the house with Adeline when she is close by or following, and can be
+called in from inside ("Call your sister in"). She trails after Adeline from room to room,
+waves now and then, and curls up on the floor when Adeline goes to sleep. Buttons on the
+left of the room:
+
+- Balloon game: tap the balloon to keep it off the floor. Her sister runs under it and bops
+  it too, and sometimes misses. The count and the best score show at the top.
+- Do her hair: pick one of four hairstyles and one of six ribbon colours. Adeline steps in
+  behind her and brushes, and the new style stays on her indoors and out.
+
+`scripts/playmate.gd` is her indoors. The hairstyles are pictures that take the place of
+her ponytail (`art_src/build_hair.py`, `art/sister/hair.json`).
 
 ## At home
 
