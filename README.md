@@ -125,8 +125,10 @@ Spirit's stable" button.
 
 - Merlin speaks his lines. Adeline shouts when she strikes, casts, jumps, gets hurt, calls
   Spirit and wins. Goblins cackle, growl before an attack, yelp and wail.
-- Spirit whinnies and snorts, and her hoofbeats follow her stride, so they speed up and slow
-  down with her.
+- Spirit whinnies and snorts. Her hoofbeats are soft thuds on turf, one for each hoof as it
+  lands, so what is heard matches her legs: four even beats at a walk, two at a trot, and at
+  a gallop four quick ones and a pause. None play while she is in the air. Other horses (the
+  race horses, the pony) are quieter and fade out with distance.
 - Effects for the wand, fireball, shield, rings, knocked rails, rolling bales and landings.
 - "Sound: on / off" sits in the bottom-left corner of the title screen and is remembered.
 - The voices were recorded with a text-to-speech service (Adeline uses the "Ainsley" voice and Merlin the "Landon" voice, both picked by ear). The effects are made from scratch

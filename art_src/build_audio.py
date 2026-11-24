@@ -141,21 +141,32 @@ def hit():
 
 
 def clop(variant):
-    seconds = 0.16
+    """A hoof coming down on turf: a soft, dull thud with a little grass in it.
+
+    There is no note in it. Ground does not ring, and an earlier version that had a tone
+    sounded like a woodblock. Every variant is a little different, as real steps are."""
+    local = np.random.default_rng(40 + variant)
+    seconds = 0.2
     n = int(SR * seconds)
-    # Small tablet speakers play almost nothing below 300 Hz, so most of a hoofbeat's
-    # knock sits in the middle of the range, with a little low weight for headphones.
-    wood = [420, 370, 470][variant]
-    ring = np.arange(n) / SR
-    body = np.sin(2 * np.pi * wood * ring) * env_decay(n, 0.016) + 0.5 * np.sin(2 * np.pi * wood * 2.1 * ring) * env_decay(n, 0.01)
-    weight = thud(seconds, 170, 95, 0.03) * 0.5
-    tick = bandpass(rng.standard_normal(n), 700, 2800) * env_decay(n, 0.009) * 0.6
-    turf = bandpass(rng.standard_normal(n), 300, 1200) * env_decay(n, 0.03) * 0.35
-    return fade(body + weight + tick + turf, 0.001, 0.03)
+
+    def level(x, peak):
+        return x / (np.abs(x).max() + 1e-9) * peak
+
+    centre = local.uniform(380, 620)
+    # The thud: noise kept to the low middle, which small tablet speakers can still play.
+    body = level(bandpass(local.standard_normal(n), centre * 0.55, centre * 1.7) * env_decay(n, local.uniform(0.018, 0.03)), 1.0)
+    # Weight underneath, for headphones and bigger speakers.
+    weight = thud(seconds, local.uniform(125, 160), 60, 0.035) * 0.45
+    # The first touch of the hoof, kept soft.
+    touch = level(bandpass(local.standard_normal(n), 1200, 3200) * env_decay(n, 0.004), local.uniform(0.16, 0.26))
+    # Grass and earth giving way.
+    grass = level(bandpass(local.standard_normal(n), 900, 4200) * env_decay(n, local.uniform(0.035, 0.06)), 0.1)
+    return fade(lowpass(body + weight + touch + grass, 5000), 0.002, 0.05)
 
 
 def land():
     first = clop(1)
+    rng.standard_normal(2 * int(SR * 0.16))  # the old hoofbeat used these; keeps later effects unchanged
     heavy = thud(0.3, 260, 120, 0.05) * 0.55
     grass = bandpass(rng.standard_normal(int(SR * 0.3)), 300, 2500) * env_decay(int(SR * 0.3), 0.07) * 0.9
     return fade(place([(0.0, heavy, 1.0), (0.0, grass, 1.0), (0.07, first, 0.9), (0.15, first, 0.5)], 0.42), 0.001, 0.05)
@@ -365,7 +376,9 @@ def main():
     sounds["whoosh"] = [save(out, "whoosh", whoosh(), 0.8)]
     sounds["burst"] = [save(out, "burst", burst(), 0.85)]
     sounds["hit"] = [save(out, "hit", hit(), 0.8)]
-    sounds["clop"] = [save(out, "clop_%d" % v, clop(v), 0.75) for v in range(3)]
+    sounds["clop"] = [save(out, "clop_%d" % v, clop(v), 0.6) for v in range(6)]
+    sounds["clop_far"] = sounds["clop"]  # other horses: the same steps, limited separately
+    rng.standard_normal(6 * int(SR * 0.16))  # the old hoofbeats used these; keeps later effects unchanged
     sounds["land"] = [save(out, "land", land(), 0.85)]
     sounds["clatter"] = [save(out, "clatter_%d" % v, clatter(40 + v), 0.75) for v in range(2)]
     sounds["thump"] = [save(out, "thump", thump(), 0.85)]

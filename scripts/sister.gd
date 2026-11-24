@@ -41,6 +41,7 @@ func _ready() -> void:
 	pony.pommel_at = Vector2(96.0, 72.0)
 	pony.hands_at = Vector2(13.0, -11.0)
 	pony.step_rate = 0.056
+	pony.hoof_pitch = 1.3
 	add_child(pony)
 	pony.state = "mounted"
 

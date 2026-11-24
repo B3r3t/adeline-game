@@ -96,6 +96,28 @@ static func girl_ride(t: float, pace: float, stride: float, rise := 0.0) -> Dict
 
 # --- Horses -------------------------------------------------------------------
 
+# When each leg takes its turn, as a share of the stride, at a walk, a trot and a gallop.
+const HORSE_TURNS := {
+	"front_near": [0.25, 0.0, 0.0], "front_far": [0.75, 0.5, 0.11],
+	"hind_near": [0.0, 0.5, 0.36], "hind_far": [0.5, 0.0, 0.47],
+}
+
+
+## The points in a stride (0 to 1) at which a hoof comes down, in order. These come from
+## the same numbers as the leg movement, so what is heard matches what is seen: four even
+## beats at a walk, two at a trot, and at a gallop four quick ones and then a pause.
+static func horse_footfalls(speed: float) -> Array:
+	var trot := smoothstep(120.0, 240.0, speed)
+	var gallop := smoothstep(300.0, 430.0, speed)
+	var beats := []
+	for leg in HORSE_TURNS:
+		var turn: Array = HORSE_TURNS[leg]
+		# A leg is furthest forward, and lands, three quarters of the way through its own turn.
+		beats.append(fposmod(0.75 - lerpf(lerpf(turn[0], turn[1], trot), turn[2], gallop), 1.0))
+	beats.sort()
+	return beats
+
+
 ## A horse on the ground. `speed` is in pixels a second and `stride` follows the ground
 ## covered. Slow is a walk (four separate beats), faster a trot (legs in diagonal pairs),
 ## fastest a gallop (hind legs then front legs, and a moment in the air).
@@ -104,11 +126,7 @@ static func horse_ground(t: float, stride: float, speed: float) -> Dictionary:
 	var moving := smoothstep(4.0, 60.0, speed)
 	var trot := smoothstep(120.0, 240.0, speed)
 	var gallop := smoothstep(300.0, 430.0, speed)
-	# When each leg takes its turn, as a share of the stride, for the three gaits.
-	var turns := {
-		"front_near": [0.25, 0.0, 0.0], "front_far": [0.75, 0.5, 0.11],
-		"hind_near": [0.0, 0.5, 0.36], "hind_far": [0.5, 0.0, 0.47],
-	}
+	var turns := HORSE_TURNS
 	var reach := lerpf(lerpf(15.0, 23.0, trot), 36.0, gallop) * moving
 	var fold := lerpf(lerpf(30.0, 50.0, trot), 74.0, gallop) * moving
 	for leg in turns:

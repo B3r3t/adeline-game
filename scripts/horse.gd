@@ -23,6 +23,7 @@ var seat_at := SEAT
 var bit_at := BIT
 var pommel_at := POMMEL
 var hands_at := Vector2(21.0, -19.0)  # the rider's hands, measured from the seat
+var hoof_pitch := 1.0  # small hooves sound lighter
 var step_rate := 0.035  # how far through a stride each pixel of ground takes her; short legs step faster
 var rig = null
 var was_air := false
@@ -162,25 +163,34 @@ func carry(delta: float) -> void:
 	position = p.position
 	facing = p.facing
 	speed = p.velocity.length()
-	if not wild:
-		_hoofbeats(speed * delta * step_rate, not p.air)
-	if state != "idle" and absf(position.x - p.position.x) < 800.0:
-		_hoofbeats(speed * delta * step_rate, true)
+	_hoofbeats(speed * delta * step_rate, not p.air)
 	stride += speed * delta * step_rate
 	_animate()
 	queue_redraw()
 
 
-## A gallop is three quick beats and a moment in the air. The beats follow Spirit's
-## stride, so they speed up and slow down with her.
+## Hoofbeats land when the hooves do: four even beats at a walk, two at a trot, and at a
+## gallop four quick ones and then a pause while she is off the ground. They are soft, and
+## softer still for any horse that is not Adeline's own, fading out with distance.
 func _hoofbeats(advance: float, on_ground: bool) -> void:
-	if not on_ground or speed < 80.0:
+	if not on_ground or speed < 30.0 or not (game.mode == "play" or game.mode == "ride"):
 		return
-	var before := fmod(stride, TAU) / TAU
+	var loud := -17.0 + 4.0 * clampf(speed / 600.0, 0.0, 1.0)
+	if wild:
+		var away := absf(position.x - float(game.player.position.x))
+		if away > 650.0:
+			return
+		loud -= 6.0 + away / 55.0
+	var before := fposmod(stride, TAU) / TAU
 	var after := before + advance / TAU
-	for beat in [0.08, 0.26, 0.44]:
+	var beats: Array = Moves.horse_footfalls(speed)
+	for i in beats.size():
+		var beat: float = beats[i]
 		if (before < beat and after >= beat) or (after >= 1.0 + beat):
-			game.sound.play("clop", -9.0 + 3.0 * clampf(speed / 600.0, 0.0, 1.0), 0.14, 1.0, 0.0)
+			# Every other beat is lighter, and no two are quite alike, so it has a lilt and
+			# not a drumming. Hooves that land together make one sound.
+			var accent: float = [0.0, -3.5, -1.0, -3.5][i]
+			game.sound.play("clop_far" if wild else "clop", loud + accent + randf_range(-2.0, 1.0), 0.08, hoof_pitch, 0.035)
 
 
 func _move_to(x: float, pace: float, delta: float) -> bool:

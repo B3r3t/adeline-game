@@ -115,7 +115,18 @@
   "clop": [
    "clop_0.ogg",
    "clop_1.ogg",
-   "clop_2.ogg"
+   "clop_2.ogg",
+   "clop_3.ogg",
+   "clop_4.ogg",
+   "clop_5.ogg"
+  ],
+  "clop_far": [
+   "clop_0.ogg",
+   "clop_1.ogg",
+   "clop_2.ogg",
+   "clop_3.ogg",
+   "clop_4.ogg",
+   "clop_5.ogg"
   ],
   "land": [
    "land.ogg"
