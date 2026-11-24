@@ -183,6 +183,12 @@ All of Mission 1 is in real art now.
   where it should be, so a change of pose blends over a few frames. Cloaks, ponytails and
   tails are on soft springs: they trail, overshoot and settle, and are thrown back or
   forward when a character starts or stops.
+- Cloaks, ponytails and tails bend along their length. Each is drawn as a row of strips, and
+  every strip turns a little more than the one before, so the tip trails, curls and ripples
+  in the wind of running (`SOFT` at the top of `scripts/rig.gd`). A horse's neck bends the
+  same way, so her head nods at a walk, reaches out at a gallop and lifts over a jump.
+- Weight: feet and hooves kick up dust, landings puff, a hit freezes the game for an instant
+  and a heavy blow shakes the picture (`puff`, `hit_stop` and `jolt` in `scripts/main.gd`).
 - The farmhouse with Spirit's stable, Merlin's hut, Merlin, the flying boat, the signpost
   and the goblin camps are single pictures.
 - The ground and the two layers of hills are long strips that repeat sideways. The hills are

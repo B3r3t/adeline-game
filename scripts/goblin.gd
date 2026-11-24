@@ -119,6 +119,9 @@ func _physics_process(delta: float) -> void:
 			if state_time >= swing_windup:
 				hit_done = false
 				_set_state(State.SWING_ACTIVE)
+				if size > 1.5:
+					game.jolt(6.0)  # the ogre's club shakes the ground
+					game.puff(position + Vector2(facing * 110.0, 0.0), 1.6)
 		State.SWING_ACTIVE:
 			if not hit_done and swing_rect().intersects(game.player.body_rect()):
 				var result: int = game.player.take_hit(position.x)
@@ -219,6 +222,8 @@ func take_damage(amount: int, from_dir: int) -> void:
 		return
 	health -= amount
 	flash = 0.15
+	game.hit_stop(0.045 if health > 0 else 0.09)
+	game.jolt(2.5 if health > 0 else 5.0)
 	game.sound.play("hit", -6.0, 0.12)
 	if health > 0:
 		game.sound.shout(mouth, cries["hurt"], 0.6)

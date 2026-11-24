@@ -160,7 +160,10 @@ func _physics_process(delta: float) -> void:
 		coyote = maxf(coyote - delta, 0.0)
 	else:
 		coyote = 0.1
+		var step_before := int(walk_phase / PI + 0.5)
 		walk_phase += absf(velocity.x) * delta * 0.06
+		if int(walk_phase / PI + 0.5) != step_before and absf(velocity.x) > 200.0 and not mounted:
+			game.puff(position + Vector2(-facing * 14.0, 0.0), 0.5)  # a foot comes down
 
 	var locked: bool = dead or game.input_locked()
 	var dir := 0.0 if locked else Input.get_axis("move_left", "move_right")
@@ -307,6 +310,8 @@ func take_hit(from_x: float) -> int:
 	if invuln > 0.0:
 		return MISSED
 	health -= 1
+	game.jolt(7.0)
+	game.hit_stop(0.07)
 	invuln = HURT_INVULN
 	game.sound.play("hit", -4.0, 0.1)
 	game.sound.shout("adeline", "hurt", 1.0, true)
@@ -338,9 +343,13 @@ func _animate() -> void:
 	# Leaving the ground stretches her a touch and landing squashes her, then she springs back.
 	if air and not was_air and velocity.y < 0.0:
 		squash_rate += 1.5
+		if not mounted:
+			game.puff(position, 0.7)
 	elif was_air and not air:
 		squash_rate -= 2.4
 		land_time = 0.0
+		for side in [-1.0, 1.0]:
+			game.puff(position + Vector2(side * (30.0 if mounted else 16.0), 0.0), 1.2 if mounted else 0.85)
 	was_air = air
 	land_time += delta
 	squash_rate += (-2.0 * 0.5 * 22.0 * squash_rate - 22.0 * 22.0 * (squash - 1.0)) * delta

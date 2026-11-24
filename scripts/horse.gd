@@ -23,6 +23,9 @@ var seat_at := SEAT
 var bit_at := BIT
 var pommel_at := POMMEL
 var hands_at := Vector2(21.0, -19.0)  # the rider's hands, measured from the seat
+# Where her neck bends, as shares of her body picture: the middle of the bend, and where
+# along her length it starts and ends. Everything in front of it (her head) nods as one.
+var neck := { "strips": 12, "across": true, "at": Vector2(0.71, 0.45), "from": 0.63, "to": 0.82, "pose": "neck" }
 var hoof_pitch := 1.0  # small hooves sound lighter
 var step_rate := 0.035  # how far through a stride each pixel of ground takes her; short legs step faster
 var rig = null
@@ -59,13 +62,14 @@ func _ready() -> void:
 	rig = Node2D.new()
 	rig.set_script(RigScript)
 	add_child(rig)
+	rig.bends["body"] = neck
 	rig.build(art)
 	# The far legs sit in shadow.
 	for part in ["leg_front_far_upper", "leg_front_far_lower", "leg_hind_far_upper", "leg_hind_far_lower"]:
 		rig.tint(part, Color(0.72, 0.72, 0.78))
 	# The saddle is a layer the same size as the body picture, laid exactly over it,
 	# under the near legs.
-	var body_sprite: Sprite2D = rig.info["body"]["sprite"]
+	var body_sprite = rig.info["body"]["sprite"]
 	saddle = Sprite2D.new()
 	if ResourceLoader.exists(art + "/saddle.png"):
 		saddle.texture = load(art + "/saddle.png")
@@ -191,6 +195,8 @@ func _hoofbeats(advance: float, on_ground: bool) -> void:
 			# not a drumming. Hooves that land together make one sound.
 			var accent: float = [0.0, -3.5, -1.0, -3.5][i]
 			game.sound.play("clop_far" if wild else "clop", loud + accent + randf_range(-2.0, 1.0), 0.08, hoof_pitch, 0.035)
+			if speed > 250.0 and i % 2 == 0:
+				game.puff(position + Vector2(-facing * randf_range(10.0, 50.0), 0.0), 0.7)
 
 
 func _move_to(x: float, pace: float, delta: float) -> bool:
@@ -246,8 +252,7 @@ func _animate() -> void:
 
 ## Where a spot on Spirit's body picture is right now, with her leaning and bobbing.
 func _body_point(pixel: Vector2) -> Vector2:
-	var body: Sprite2D = rig.info["body"]["sprite"]
-	return body.position + ((pixel + body.offset) * rig.tex_scale).rotated(body.rotation)
+	return rig.point("body", pixel)
 
 
 ## Keeps the saddle on her back and hangs the reins from the bit: to Adeline's hands
@@ -258,7 +263,7 @@ func _tack() -> void:
 		line.visible = tack
 	if not tack:
 		return
-	var body: Sprite2D = rig.info["body"]["sprite"]
+	var body = rig.info["body"]["sprite"]
 	saddle.position = body.position
 	saddle.rotation = body.rotation
 	var from := _body_point(bit_at)

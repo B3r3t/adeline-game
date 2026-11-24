@@ -144,6 +144,11 @@ static func horse_ground(t: float, stride: float, speed: float) -> Dictionary:
 	var nod := sin(stride * 2.0) * 1.1 * moving * (1.0 - trot)
 	var rock := sin(stride + 0.9) * 3.4 * gallop
 	pose["body"] = nod + rock + sin(t * 0.8) * 0.5 * (1.0 - moving)
+	# Her head: it nods at a walk, is carried steady at a trot, and reaches out and down
+	# with every stride of a gallop. Standing, she looks about and now and then drops it.
+	var graze := pow(maxf(0.0, sin(t * 0.23 + 1.0)), 8.0) * 9.0
+	pose["neck"] = sin(stride * 2.0 + 0.4) * 4.0 * moving * (1.0 - trot) + sin(stride * 2.0) * 1.3 * trot * (1.0 - gallop) \
+		+ (2.0 + sin(stride + 2.6) * 6.0) * gallop + (sin(t * 0.6) * 2.0 + graze) * (1.0 - moving)
 	var hop := (0.5 - 0.5 * cos(stride * 2.0 + 0.6)) * 3.6 * trot * (1.0 - gallop)
 	var bound := (0.5 - 0.5 * cos(stride + 2.2)) * 7.0 * gallop
 	pose["_lift"] = -(hop + bound) - sin(t * 1.5) * 0.7 * (1.0 - moving)
@@ -169,4 +174,5 @@ static func horse_air(pose: Dictionary, fall: float) -> void:
 		pose["leg_hind_%s_upper" % side] = lerpf(36.0, 14.0, k) - apart
 		pose["leg_hind_%s_lower" % side] = lerpf(10.0, -44.0, k)
 	pose["tail"] = lerpf(30.0, 40.0, k)
+	pose["neck"] = lerpf(-9.0, 9.0, k)  # head up as she rises, stretched out as she comes down
 	pose["_lift"] = 0.0

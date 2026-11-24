@@ -64,6 +64,8 @@ const ENCOUNTERS := [
 var player = null
 var horse = null
 var sister = null  # Adeline's little sister, on her pony
+var puffs: Array = []  # dust kicked up by feet and hooves: [where, age, size, drift]
+var shake := 0.0  # how hard the picture is being shaken, in pixels
 var mission2 = null  # the rescue of Mom and Dad, and the island it happens on
 var ride = null  # the riding course
 var sound = null  # voices, grunts and effects
@@ -465,6 +467,23 @@ func _update_limits() -> void:
 
 func input_locked() -> bool:
 	return mode == "title" or mode == "house" or mode == "stable" or dialog.active or defeated or (mode == "ride" and ride.finished) or (mode == "play" and (sister.busy() or mission2.fading()))
+
+
+## A little cloud of dust on the ground.
+func puff(at: Vector2, size := 1.0) -> void:
+	if puffs.size() < 48:
+		puffs.append([at, 0.0, size, randf_range(-1.0, 1.0)])
+
+
+## Shakes the picture for a moment, for a heavy blow.
+func jolt(amount: float) -> void:
+	shake = maxf(shake, amount)
+
+
+## Freezes everything for an instant when a hit lands, so it is felt.
+func hit_stop(seconds := 0.05) -> void:
+	Engine.time_scale = 0.06
+	get_tree().create_timer(seconds, true, false, true).timeout.connect(func(): Engine.time_scale = 1.0)
 
 
 func toast(text: String) -> void:
@@ -1086,6 +1105,11 @@ func _process(delta: float) -> void:
 			if FileAccess.file_exists(guard):
 				DirAccess.remove_absolute(ProjectSettings.globalize_path(guard))
 	toast_time = maxf(toast_time - delta, 0.0)
+	for dust in puffs:
+		dust[1] = float(dust[1]) + delta
+	puffs = puffs.filter(func(d): return float(d[1]) < 0.5)
+	shake = move_toward(shake, 0.0, delta * 34.0)
+	camera.offset = Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0)) * shake
 	goblins = goblins.filter(func(g): return is_instance_valid(g))
 	# Merlin turns to face Adeline. A goblin camp packs up once its goblins are beaten.
 	merlin.flip_h = player.position.x < MERLIN_X
@@ -1112,6 +1136,11 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	_draw_merlin_mark(g)
 	_draw_river(g)
+	for dust in puffs:
+		var age := float(dust[1]) / 0.5
+		var big := float(dust[2])
+		var at: Vector2 = dust[0] + Vector2(float(dust[3]) * 9.0 * age, -3.0 - 11.0 * age * big)
+		draw_circle(at, (4.0 + 13.0 * age) * big, Color(0.95, 0.9, 0.78, 0.5 * (1.0 - age)))
 
 
 func _draw_merlin_mark(g: float) -> void:
