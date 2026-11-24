@@ -112,6 +112,39 @@ OGRE = {
 }
 
 
+def rider(name, height, torso, legs, cloak, shoulder, elbow, arm_at, split, hood_at, head, head_at, tail):
+    """One of the riders in a race. They are drawn on Adeline's pattern of sheet, so they are
+    put together the same way, each with their own joints."""
+    upper = lambda x, y: (x < split[0]) & (y < split[1])
+    lower = lambda x, y: (x >= split[0]) | (y > split[2])
+    return {
+        "name": "rider_" + name, "sheet": "rider_%s_a" % name, "height": height, "measure": ["leg_near_lower", "head"],
+        "parts": [
+            ("torso", 2, 1.0, torso, None, None, 3),
+            ("leg_far_upper", 4, 1.0, (55, 20), "torso", legs[0], 2, above(160)),
+            ("leg_far_lower", 4, 1.0, (40, 148), "leg_far_upper", (40, 148), 1, below(136)),
+            ("leg_near_upper", 3, 1.0, (55, 20), "torso", legs[1], 5, above(160)),
+            ("leg_near_lower", 3, 1.0, (40, 148), "leg_near_upper", (40, 148), 4, below(136)),
+            ("cloak_back", 6, 1.15, (141, 8), "torso", cloak, 0),
+            ("arm_upper", 5, 1.0, shoulder, "torso", arm_at, 7, upper),
+            ("arm_lower", 5, 1.0, elbow, "arm_upper", elbow, 6, lower),
+            ("hood", 7, 0.8, (146, 60), "torso", hood_at, 8),
+            ("head", 0, 0.7, head, "torso", head_at, 9),
+            ("ponytail", 1, 0.7, tail[0], "head", tail[1], 10),
+        ],
+    }
+
+
+RIDERS = [
+    rider("finn", 100.0, (72, 236), [(82, 234), (64, 234)], (58, 28), (55, 48), (38, 135), (62, 56), (85, 142, 118),
+          (92, 30), (128, 218), (92, 16), [(205, 32), (62, 96)]),
+    rider("rosa", 100.0, (92, 232), [(102, 230), (84, 230)], (62, 36), (52, 72), (40, 150), (66, 66), (80, 158, 134),
+          (106, 32), (138, 222), (108, 16), [(212, 48), (66, 104)]),
+    rider("baron", 116.0, (84, 240), [(94, 238), (76, 238)], (56, 46), (55, 80), (32, 165), (58, 84), (80, 172, 148),
+          (94, 46), (130, 246), (96, 34), [(200, 52), (62, 150)]),
+]
+
+
 def rot(v, deg):
     r = math.radians(deg)
     return (v[0] * math.cos(r) - v[1] * math.sin(r), v[0] * math.sin(r) + v[1] * math.cos(r))
@@ -210,7 +243,7 @@ def export(spec, parts_dir, out_dir):
 if __name__ == "__main__":
     parts_dir, out_root = sys.argv[1], sys.argv[2]
     preview = sys.argv[3] if len(sys.argv) > 3 else None
-    for spec in (ADELINE, SPIRIT, GOBLIN, SISTER, PONY, OGRE):
+    for spec in [ADELINE, SPIRIT, GOBLIN, SISTER, PONY, OGRE] + RIDERS:
         export(spec, parts_dir, os.path.join(out_root, spec["name"]))
     if preview:
         render(ADELINE, parts_dir, [
@@ -251,3 +284,8 @@ if __name__ == "__main__":
             {"arm": -70, "body": -8, "leg_near": 8, "leg_far": 8},
             {"arm": 75, "body": 8, "leg_near": -8, "leg_far": -8},
         ], os.path.join(preview, "ogre_poses.png"), px_per_world=2.6, cell=(520, 480))
+        for spec in RIDERS:
+            render(spec, parts_dir, [
+                {},
+                {"leg_near_upper": -55, "leg_near_lower": 60, "leg_far_upper": -55, "leg_far_lower": 60, "arm_upper": -14, "arm_lower": 8, "torso": 8, "cloak_back": 24, "ponytail": 18},
+            ], os.path.join(preview, spec["name"] + "_poses.png"), px_per_world=3.4, cell=(420, 460))

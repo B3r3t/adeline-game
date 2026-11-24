@@ -26,6 +26,8 @@ var hands_at := Vector2(21.0, -19.0)  # the rider's hands, measured from the sea
 # Where her neck bends, as shares of her body picture: the middle of the bend, and where
 # along her length it starts and ends. Everything in front of it (her head) nods as one.
 var neck := { "strips": 12, "across": true, "at": Vector2(0.71, 0.45), "from": 0.63, "to": 0.82, "pose": "neck" }
+var rider_art := ""  # drawings for a rider of her own (the other horses in a race have one)
+var jockey = null
 var hoof_pitch := 1.0  # small hooves sound lighter
 var step_rate := 0.035  # how far through a stride each pixel of ground takes her; short legs step faster
 var rig = null
@@ -85,6 +87,13 @@ func _ready() -> void:
 	rider.build("res://art/adeline")
 	rider.show_only("leg_near")
 	rider.visible = false
+	if rider_art != "":
+		jockey = Node2D.new()
+		jockey.set_script(RigScript)
+		add_child(jockey)
+		jockey.build(rider_art)
+		for part in ["leg_far_upper", "leg_far_lower"]:
+			jockey.info[part]["sprite"].visible = false  # on the other side of the horse
 	for style in [[5.0, Color(0.13, 0.07, 0.04)], [2.4, Color(0.5, 0.27, 0.13)]]:
 		var line := Line2D.new()
 		line.width = style[0]
@@ -248,6 +257,17 @@ func _animate() -> void:
 	_tack()
 	rider.pose = { "leg_near_upper": -52.0, "leg_near_lower": 62.0 }
 	rider.apply()
+	if jockey != null:
+		# Her rider sits to the stride and folds forward over a jump, as Adeline does.
+		var up := -float(_who().velocity.y) if in_air else 0.0
+		var sits: Dictionary = Moves.girl_ride(clock, clampf(speed / 560.0, 0.0, 1.0), stride, up)
+		var settle := float(sits["_lift"])
+		sits.erase("_lift")
+		jockey.pose = sits
+		jockey.scale = Vector2(facing, 1.0)
+		jockey.root_angle = rig.root_angle
+		jockey.root_offset = seat() - jockey.rest_pos("torso") + Vector2(0.0, settle)
+		jockey.apply()
 
 
 ## Where a spot on Spirit's body picture is right now, with her leaning and bobbing.

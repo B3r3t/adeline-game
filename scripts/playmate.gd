@@ -56,6 +56,9 @@ func opened() -> void:
 func closed() -> void:
 	if here:
 		game.sister.put(game.DOOR_X + 80.0)  # she comes back out with Adeline
+		if game.sister.mode == "roam":
+			game.sister.roam()  # and stands by the door a moment before wandering off
+			game.sister.rest = 3.0
 	here = false
 	rig = null
 	balloon = null

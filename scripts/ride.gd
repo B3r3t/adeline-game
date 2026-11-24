@@ -33,6 +33,8 @@ const TICK := 1.0 / 60.0  # the step used when working out a jump in advance
 const RIDER_HEIGHT := 112.0  # how far above Spirit's hooves the middle of Adeline is
 const FINISH_SIZE := 1.5  # the finish gate is drawn this much bigger, so a rider fits under its banner
 const CROWD_FACES := 16  # how many different spectators there are pictures of
+# Who rides each of the other horses, in the order of RIVALS: their drawings and their name.
+const RIDERS := [["finn", "Finn"], ["rosa", "Rosa"], ["baron", "Baron Vex"]]
 const RING_OPENING := 112.0  # how far above or below a ring's middle she can be and still get it
 const RING_REACH := 72.0  # Spirit is long: the ring counts from her nose reaching it to her tail leaving it
 const RING_AIM := 29.0  # how closely a worked-out jump must thread a ring when the course is built
@@ -388,6 +390,7 @@ func _build() -> void:
 		add_child(part)
 	if racing:
 		_add_rivals(rng)
+		game.toast("Racing %s, %s and %s!" % [RIDERS[0][1], RIDERS[1][1], RIDERS[2][1]])
 
 
 ## People who have come to watch the race: a few here and there along the track, and a
@@ -493,7 +496,8 @@ func _add_rivals(rng: RandomNumberGenerator) -> void:
 		node.set_script(HorseScript)
 		node.game = game
 		node.wild = true
-		node.tack = false
+		node.tack = true
+		node.rider_art = "res://art/rider_%s" % RIDERS[i][0]
 		node.subject = who
 		add_child(node)
 		node.state = "mounted"

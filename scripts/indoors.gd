@@ -15,6 +15,7 @@ extends Control
 
 const RigScript := preload("res://scripts/rig.gd")
 const PlaymateScript := preload("res://scripts/playmate.gd")
+const KitchenScript := preload("res://scripts/kitchen.gd")
 const Moves := preload("res://scripts/moves.gd")
 
 const ROOM := Vector2(1344.0, 752.0)
@@ -85,6 +86,7 @@ var note_time := 0.0
 # Adeline, who walks about in both rooms.
 var adeline = null
 var playmate = null  # her little sister, when she is in the house
+var kitchen = null  # the family at their cooking and their dinner
 var at := Vector2.ZERO  # where her feet are
 var goal := Vector2.ZERO
 var facing := 1
@@ -143,6 +145,11 @@ func _ready() -> void:
 	playmate.inn = self
 	playmate.game = game
 	add_child(playmate)
+	kitchen = Node.new()
+	kitchen.set_script(KitchenScript)
+	kitchen.inn = self
+	kitchen.game = game
+	add_child(kitchen)
 	if FileAccess.file_exists(SAVE_PATH):
 		var saved = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 		if saved is Dictionary:
@@ -166,7 +173,8 @@ func _save() -> void:
 		if room == "bathroom":
 			home["teeth"] = { "clean": 1.0 - plaque_left(), "time": Time.get_unix_time_from_system() }
 		elif room != "":
-			home["room" if room == "living" else "bedroom"] = list
+			if room == "living" or room == "bedroom":
+				home["room" if room == "living" else "bedroom"] = list
 	home["care"]["time"] = Time.get_unix_time_from_system()
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file != null:
@@ -175,7 +183,7 @@ func _save() -> void:
 
 func _tex(name: String) -> Texture2D:
 	if not textures.has(name):
-		var ext := "jpg" if name in ["room", "stable", "bedroom", "bathroom", "mouth", "plaque"] else "png"
+		var ext := "jpg" if name in ["room", "stable", "bedroom", "bathroom", "kitchen", "mouth", "plaque"] else "png"
 		textures[name] = load("res://art/room/%s.%s" % [name, ext])
 	return textures[name]
 
@@ -257,6 +265,7 @@ func close() -> void:
 	place = ""
 	visible = false
 	playmate.closed()
+	kitchen.closed()
 
 
 func _layout() -> void:
@@ -313,18 +322,22 @@ func _enter_room(which: String) -> void:
 	mirror = null
 	mouth = null
 	room = which
-	backdrop.texture = _tex({ "living": "room", "bedroom": "bedroom", "bathroom": "bathroom" }[which])
+	backdrop.texture = _tex({ "living": "room", "bedroom": "bedroom", "bathroom": "bathroom", "kitchen": "kitchen" }[which])
 	_layout()
 	# She comes in by the door: on the right of the living room, on the left of the bedroom.
-	at = Vector2(_seen().end.x - 190.0 if which == "living" else _seen().position.x + 190.0, _front() - 14.0)
+	var by_right := which == "living" or which == "kitchen"
+	at = Vector2(_seen().end.x - 190.0 if by_right else _seen().position.x + 190.0, _front() - 14.0)
 	goal = at
-	facing = -1 if which == "living" else 1
+	facing = -1 if by_right else 1
 	clock = 0.0
 	next_id = 1
 	playmate.entered_room()
+	kitchen.entered_room()
 	if which == "bathroom":
 		_open_bathroom()
 		return
+	if which == "kitchen":
+		return  # nothing is put in the kitchen: the family have it as they like it
 	for data in home["room" if which == "living" else "bedroom"]:
 		if not (data is Dictionary) or _named(str(data.get("t", ""))).is_empty():
 			continue
@@ -345,6 +358,8 @@ func _enter_room(which: String) -> void:
 func _list() -> Array:
 	if room == "bathroom":
 		return []
+	if room == "kitchen":
+		return []
 	return FURNITURE if room == "living" else BEDROOM
 
 
@@ -362,7 +377,8 @@ func _doors() -> Array:
 	var right := Rect2(s.x - 236.0, 124.0, 212.0, 52.0)
 	match room:
 		"living":
-			return [[right, "bedroom", "To the bedroom"], [left, "bathroom", "To the bathroom"]]
+			var below := Rect2(s.x - 236.0, 188.0, 212.0, 52.0)
+			return [[right, "bedroom", "To the bedroom"], [left, "bathroom", "To the bathroom"], [below, "kitchen", "To the kitchen"]]
 		"bedroom":
 			return [[left, "living", "To the living room"]]
 	return [[right, "living", "To the living room"]]
@@ -1107,6 +1123,7 @@ func _process(delta: float) -> void:
 	_animate_adeline(delta)
 	if place == "house":
 		playmate.frame(delta)
+		kitchen.frame(delta)
 	overlay.queue_redraw()
 
 
@@ -1392,6 +1409,10 @@ func _draw_house(s: Vector2) -> void:
 	if room == "bedroom":
 		_button(_sleep_rect(), "Wake up" if sleep > 0 else "Go to sleep", 20, Color(0.3, 0.3, 0.7, 0.9))
 	if sleep > 0:
+		return
+	if room == "kitchen":
+		if playmate.play == "":
+			kitchen.draw_ui(s)
 		return
 	if playmate.play != "":
 		return  # a game with her sister is on: the room's own hints and buttons wait

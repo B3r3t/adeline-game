@@ -90,6 +90,14 @@ The course runs on real physics:
   reached at an easy pace.
 - `scripts/ride.gd` holds all of it. The forces and speeds are at the top.
 
+### The other riders
+
+Each of the other horses in a race has a rider: Finn in green on Thunder, Rosa in red on
+Daisy, and Baron Vex, a pantomime villain in a top hat and black cape, on Pepper. They are
+drawn on Adeline's pattern of sheet and built the same way (`RIDERS` in
+`art_src/build_rig.py`, art in `art/rider_*`), and sit to the stride and fold over a jump
+as she does (`jockey` in `scripts/horse.gd`).
+
 ### The crowd at a race
 
 People come to watch a race: a few groups here and there along the track and a bigger
@@ -136,6 +144,15 @@ left of the room:
 
 `scripts/playmate.gd` is her indoors. The hairstyles are pictures that take the place of
 her ponytail (`art_src/build_hair.py`, `art/sister/hair.json`).
+
+### The kitchen
+
+A fourth room, reached from the living room. The family have it as they like it, so
+nothing is placed here. It goes round on the clock (`scripts/kitchen.gd`): a while of
+cooking at the stove while the table is laid, a longer while with everyone sat at the
+table and dinner on it, then a short spell when the kitchen is empty. Grandma is always
+part of it; Mom and Dad join once they have been rescued. While dinner is on the table
+Adeline can sit down and eat with them.
 
 ## At home
 
