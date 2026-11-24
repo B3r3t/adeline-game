@@ -46,6 +46,7 @@ var attacks := "both"  # "swing", "charge" or "both", so each attack can be taug
 var min_x := -INF
 var max_x := INF
 var rig = null
+var shown_squash := 1.0
 
 
 func _ready() -> void:
@@ -202,15 +203,25 @@ func take_damage(amount: int, from_dir: int) -> void:
 func _animate() -> void:
 	var pose := {}
 	var squash := 1.0
+	var lift := 0.0
 	var tint := Color.WHITE
 	var pulse := 0.5 + 0.5 * sin(anim_time * 22.0)
 	match state:
 		State.APPROACH:
 			if absf(velocity.x) > 10.0:
+				# A waddle: the body rolls over each step and the head and club bob along.
 				var step := sin(anim_time * 14.0)
-				pose["leg_near"] = step * 28.0
-				pose["leg_far"] = -step * 28.0
-				pose["arm"] = step * 5.0
+				pose["leg_near"] = step * 30.0
+				pose["leg_far"] = -step * 30.0
+				pose["arm"] = step * 12.0 + sin(anim_time * 28.0) * 3.0
+				pose["body"] = 3.0 + sin(anim_time * 28.0 + 0.5) * 2.5
+				pose["head"] = -step * 4.0
+				lift = -absf(sin(anim_time * 14.0)) * 3.0
+			else:
+				# Standing: breathing and shifting about.
+				pose["body"] = sin(anim_time * 2.2) * 1.5
+				pose["head"] = sin(anim_time * 1.3) * 4.0
+				pose["arm"] = sin(anim_time * 2.2 + 1.0) * 4.0
 		State.SWING_WINDUP:
 			# Club goes up and shakes: the warning for the swing.
 			var up := clampf(state_time / 0.25, 0.0, 1.0)
@@ -252,8 +263,16 @@ func _animate() -> void:
 		tint = Color(2.4, 2.4, 2.4)
 	tint.a = fade
 	rig.modulate = tint
-	rig.scale = Vector2(facing, squash)
+	# Crouching and springing up are eased, not snapped.
+	shown_squash = lerpf(shown_squash, squash, minf(get_physics_process_delta_time() * 18.0, 1.0))
+	if signf(rig.scale.x) != float(facing):
+		rig.scale = Vector2(facing, shown_squash)
+		rig.reset_physics_interpolation()
+	rig.scale = Vector2(facing, shown_squash)
+	if state == State.SWING_ACTIVE:
+		rig.sharp["arm"] = true  # the swing has its own timing
 	rig.pose = pose
+	rig.root_offset = Vector2(0.0, lift)
 	rig.apply()
 
 

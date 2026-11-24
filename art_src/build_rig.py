@@ -61,6 +61,43 @@ GOBLIN = {
 }
 
 
+# Adeline's little sister: a five-year-old, so a big head, a short body and short limbs.
+SISTER = {
+    "name": "sister", "sheet": "sister_a", "height": 72.0, "measure": ["leg_near_lower", "head"],
+    "parts": [
+        ("torso", 2, 0.86, (77, 205), None, None, 3),
+        ("leg_far_upper", 4, 0.8, (50, 18), "torso", (88, 200), 2, above(112)),
+        ("leg_far_lower", 4, 0.8, (50, 100), "leg_far_upper", (50, 100), 1, below(88)),
+        ("leg_near_upper", 3, 0.8, (50, 18), "torso", (70, 200), 5, above(112)),
+        ("leg_near_lower", 3, 0.8, (50, 100), "leg_near_upper", (50, 100), 4, below(88)),
+        ("cloak_back", 6, 0.8, (133, 10), "torso", (46, 34), 0),
+        # Her arm is drawn in front of everything, so a wave shows in front of her face.
+        ("arm_upper", 5, 0.8, (48, 22), "torso", (60, 56), 12, lambda x, y: (x < 78) & (y < 100)),
+        ("arm_lower", 5, 0.8, (40, 92), "arm_upper", (40, 92), 11, lambda x, y: (x >= 78) | (y > 72)),
+        ("hood", 7, 0.56, (128, 62), "torso", (84, 30), 8),
+        ("head", 0, 0.8, (128, 216), "torso", (86, 20), 9),
+        ("ponytail", 1, 0.8, (120, 50), "head", (42, 74), 10),
+    ],
+}
+
+# Her pony: a round body, a big head and short sturdy legs. Not a small horse.
+PONY = {
+    "name": "pony", "sheet": "pony_a", "height": 92.0, "measure": ["leg_front_near_lower", "body"],
+    "parts": [
+        ("body", 0, 1.0, (231, 318), None, None, 5),
+        ("tail", 5, 0.85, (182, 26), "body", (40, 212), 0),
+        ("leg_hind_far_upper", 4, 0.82, (105, 45), "body", (98, 296), 2, above(162)),
+        ("leg_hind_far_lower", 4, 0.82, (50, 150), "leg_hind_far_upper", (50, 150), 1, below(138)),
+        ("leg_front_far_upper", 2, 0.82, (55, 40), "body", (306, 296), 4, above(140)),
+        ("leg_front_far_lower", 2, 0.82, (58, 128), "leg_front_far_upper", (58, 128), 3, below(116)),
+        ("leg_hind_near_upper", 3, 0.82, (105, 45), "body", (74, 304), 7, above(162)),
+        ("leg_hind_near_lower", 3, 0.82, (50, 150), "leg_hind_near_upper", (50, 150), 6, below(138)),
+        ("leg_front_near_upper", 1, 0.82, (55, 40), "body", (286, 304), 9, above(140)),
+        ("leg_front_near_lower", 1, 0.82, (58, 128), "leg_front_near_upper", (58, 128), 8, below(116)),
+    ],
+}
+
+
 def rot(v, deg):
     r = math.radians(deg)
     return (v[0] * math.cos(r) - v[1] * math.sin(r), v[0] * math.sin(r) + v[1] * math.cos(r))
@@ -159,7 +196,7 @@ def export(spec, parts_dir, out_dir):
 if __name__ == "__main__":
     parts_dir, out_root = sys.argv[1], sys.argv[2]
     preview = sys.argv[3] if len(sys.argv) > 3 else None
-    for spec in (ADELINE, SPIRIT, GOBLIN):
+    for spec in (ADELINE, SPIRIT, GOBLIN, SISTER, PONY):
         export(spec, parts_dir, os.path.join(out_root, spec["name"]))
     if preview:
         render(ADELINE, parts_dir, [
@@ -181,3 +218,16 @@ if __name__ == "__main__":
             {"arm": 75, "body": 8},
             {"body": 20, "head": 10},
         ], os.path.join(preview, "goblin_poses.png"), px_per_world=5.0, cell=(420, 440))
+        render(SISTER, parts_dir, [
+            {},
+            {"leg_near_upper": -26, "leg_near_lower": 6, "leg_far_upper": 22, "leg_far_lower": 30, "arm_upper": 8},
+            {"leg_near_upper": -55, "leg_near_lower": 60, "leg_far_upper": -55, "leg_far_lower": 60, "arm_upper": -14, "arm_lower": 8, "torso": 6, "cloak_back": 20, "ponytail": 14},
+            {"arm_upper": -105, "arm_lower": -20},
+        ], os.path.join(preview, "sister_poses.png"), px_per_world=4.5, cell=(420, 440))
+        render(PONY, parts_dir, [
+            {},
+            {"leg_front_near_upper": -23, "leg_front_near_lower": 6, "leg_front_far_upper": -6, "leg_front_far_lower": 46,
+             "leg_hind_near_upper": 19, "leg_hind_near_lower": 6, "leg_hind_far_upper": -15, "leg_hind_far_lower": -20, "tail": 14},
+            {"leg_front_near_upper": -54, "leg_front_near_lower": 88, "leg_front_far_upper": -49, "leg_front_far_lower": 83,
+             "leg_hind_near_upper": 36, "leg_hind_near_lower": 10, "leg_hind_far_upper": 31, "leg_hind_far_lower": 10, "tail": 30, "body": -10},
+        ], os.path.join(preview, "pony_poses.png"), px_per_world=4.0, cell=(640, 520))

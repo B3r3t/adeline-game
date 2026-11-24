@@ -4,6 +4,7 @@ extends CharacterBody2D
 
 const FireballScript := preload("res://scripts/fireball.gd")
 const RigScript := preload("res://scripts/rig.gd")
+const Moves := preload("res://scripts/moves.gd")
 
 const SPEED := 300.0
 const ACCEL := 2600.0
@@ -62,6 +63,12 @@ var air := false  # off the ground, on foot or on Spirit
 var pitch := 0.0  # how far Spirit is tipped to match the hill under her
 var hit_area: Area2D = null  # Spirit's legs, for knocking things over on the riding course
 var rig = null
+var was_air := false
+var land_time := 9.0  # seconds since she last landed
+var squash := 1.0  # her height as a share of normal: stretched in a jump, squashed on landing
+var squash_rate := 0.0
+var last_speed := 0.0
+var lean := 0.0
 var min_x := -INF
 var max_x := INF
 
@@ -110,6 +117,12 @@ func reset(at: Vector2) -> void:
 	invuln = 0.0
 	knock = 0.0
 	mounted = false
+	was_air = false
+	land_time = 9.0
+	squash = 1.0
+	squash_rate = 0.0
+	last_speed = 0.0
+	lean = 0.0
 	reset_physics_interpolation()
 
 
@@ -313,66 +326,67 @@ func _ease_out(k: float) -> float:
 
 func _animate() -> void:
 	var t := anim_time
-	var sway := sin(t * 2.4)
-	var pose := {
-		"cloak_back": 2.0 + sway * 2.0, "ponytail": sway * 3.0,
-		"torso": sway * 0.6, "arm_upper": sway * 1.5, "head": -sway * 0.6,
-	}
+	var delta := get_physics_process_delta_time()
+	var pose: Dictionary
 	var offset := Vector2.ZERO
 	rig.root_angle = 0.0
-	if rig.scale.x != facing:
-		rig.scale.x = facing
-		rig.reset_physics_interpolation()  # turn around in one frame, not as a squash
 	rig.visible = not (invuln > 0.0 and not dead and int(t * 16.0) % 2 == 0)
 	# On horseback her far leg is on the other side of Spirit, out of sight.
 	for part in ["leg_far_upper", "leg_far_lower"]:
 		rig.info[part]["sprite"].visible = not mounted or dead
 
+	# Leaving the ground stretches her a touch and landing squashes her, then she springs back.
+	if air and not was_air and velocity.y < 0.0:
+		squash_rate += 1.5
+	elif was_air and not air:
+		squash_rate -= 2.4
+		land_time = 0.0
+	was_air = air
+	land_time += delta
+	squash_rate += (-2.0 * 0.5 * 22.0 * squash_rate - 22.0 * 22.0 * (squash - 1.0)) * delta
+	squash = clampf(squash + squash_rate * delta, 0.86, 1.12)
+	# Leaning into a start and back against a stop.
+	var push := clampf((velocity.x - last_speed) / maxf(delta, 0.001) * facing * 0.0022, -6.0, 6.0)
+	last_speed = velocity.x
+	lean = lerpf(lean, push, minf(delta * 12.0, 1.0))
+
 	if dead:
 		# Lying down for a rest.
+		pose = Moves.girl_idle(t)
+		pose["_lift"] = 0.0
 		rig.root_angle = -PI / 2.0
 		offset = Vector2(-10.0, -rig.rest_pos("torso").y - 12.0)
 	elif mounted:
 		var pace := clampf(velocity.length() / RIDE_SPEED, 0.0, 1.0)
+		pose = Moves.girl_ride(t, pace, game.horse.stride, -velocity.y if air else 0.0)
 		rig.root_angle = game.horse.rig.root_angle
-		pose["leg_near_upper"] = -55.0
-		pose["leg_near_lower"] = 60.0
-		pose["leg_far_upper"] = -55.0
-		pose["leg_far_lower"] = 60.0
-		pose["arm_upper"] = -14.0
-		pose["arm_lower"] = 8.0
-		pose["torso"] = 3.0 + pace * 5.0
-		pose["cloak_back"] = 4.0 + pace * 24.0 + sway * 3.0
-		pose["ponytail"] = pace * 20.0 + sway * 3.0
 		offset = game.horse.seat() - rig.rest_pos("torso")
 	elif air:
-		var falling := velocity.y > 0.0
-		pose["leg_near_upper"] = -20.0 if falling else -40.0
-		pose["leg_near_lower"] = 22.0 if falling else 54.0
-		pose["leg_far_upper"] = 12.0 if falling else 20.0
-		pose["leg_far_lower"] = 14.0 if falling else 24.0
-		pose["arm_upper"] = -34.0 if falling else -22.0
-		pose["cloak_back"] = 36.0 if falling else 16.0
-		pose["ponytail"] = 28.0 if falling else 10.0
+		pose = Moves.girl_air(velocity.y)
 	elif absf(velocity.x) > 20.0:
 		# Steps are tied to distance covered, so her feet do not slide.
-		var ph := walk_phase
-		pose["leg_near_upper"] = sin(ph) * 28.0
-		pose["leg_near_lower"] = maxf(0.0, -cos(ph)) * 50.0
-		pose["leg_far_upper"] = sin(ph + PI) * 28.0
-		pose["leg_far_lower"] = maxf(0.0, -cos(ph + PI)) * 50.0
-		pose["arm_upper"] = -sin(ph) * 10.0
-		pose["arm_lower"] = -6.0
-		pose["torso"] = 4.0
-		pose["head"] = -2.0
-		pose["cloak_back"] = 14.0 + sin(ph * 2.0) * 3.0
-		pose["ponytail"] = 12.0 + sin(ph * 2.0 + 1.0) * 4.0
-		offset.y = -absf(sin(ph)) * 2.5
+		pose = Moves.girl_run(walk_phase, clampf(absf(velocity.x) / SPEED, 0.0, 1.0))
+		pose["torso"] = float(pose["torso"]) + lean
+	else:
+		pose = Moves.girl_idle(t)
+		pose["torso"] = float(pose["torso"]) + lean
+	if not mounted and not dead and not air and land_time < 0.24:
+		Moves.girl_land(pose, land_time / 0.24)
+	offset.y += float(pose["_lift"])
+	pose.erase("_lift")
+	var stretch := 1.0 if mounted or dead else squash
+	var want := Vector2(facing * (2.0 - stretch), stretch)
+	if signf(rig.scale.x) != signf(want.x):
+		rig.scale = want
+		rig.reset_physics_interpolation()  # turn around in one frame, not as a squash
+	rig.scale = want
 
 	# Wand actions. Each has a wind-up, the action itself, and an easy return.
 	if not dead:
 		if is_striking() and not mounted:
 			var s := strike_time
+			for part in ["arm_upper", "arm_lower", "torso"]:
+				rig.sharp[part] = true  # a strike has its own timing, so it is not eased
 			if s < STRIKE_WINDUP:
 				var k := s / STRIKE_WINDUP
 				pose["arm_upper"] = lerpf(0.0, -125.0, k)

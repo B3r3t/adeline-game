@@ -975,6 +975,10 @@ func _process(delta: float) -> void:
 	goblins = goblins.filter(func(g): return is_instance_valid(g))
 	# Merlin turns to face Adeline. A goblin camp packs up once its goblins are beaten.
 	merlin.flip_h = player.position.x < MERLIN_X
+	# He breathes, so he does not look like a cardboard cutout.
+	var breath := 1.0 + sin(clock * 1.8) * 0.012
+	merlin.scale.y = ART_SCALE * breath
+	merlin.position.y = GROUND_Y + 4.0 - merlin.texture.get_height() * ART_SCALE * breath
 	for n in camps.size():
 		camps[n].visible = n >= cleared()
 	queue_redraw()

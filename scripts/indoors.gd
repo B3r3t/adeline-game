@@ -14,6 +14,7 @@ extends Control
 ## room is scaled to fill whatever screen it is on.
 
 const RigScript := preload("res://scripts/rig.gd")
+const Moves := preload("res://scripts/moves.gd")
 
 const ROOM := Vector2(1344.0, 752.0)
 const SAVE_PATH := "user://home.json"
@@ -1097,23 +1098,14 @@ func _process(delta: float) -> void:
 
 
 func _animate_adeline(delta: float) -> void:
-	var sway := sin(clock * 2.4)
-	var pose := { "cloak_back": 2.0 + sway * 2.0, "ponytail": sway * 3.0, "torso": sway * 0.6, "arm_upper": sway * 1.5, "head": -sway * 0.6 }
-	var lift := 0.0
+	var pose: Dictionary = Moves.girl_idle(clock)
 	var to := goal - at
 	if to.length() > 5.0:
 		at += to.normalized() * minf(260.0 * delta, to.length())
 		if absf(to.x) > 3.0:
 			facing = 1 if to.x > 0.0 else -1
 		walk += 260.0 * delta * 0.026
-		pose["leg_near_upper"] = sin(walk) * 28.0
-		pose["leg_near_lower"] = maxf(0.0, -cos(walk)) * 50.0
-		pose["leg_far_upper"] = sin(walk + PI) * 28.0
-		pose["leg_far_lower"] = maxf(0.0, -cos(walk + PI)) * 50.0
-		pose["arm_upper"] = -sin(walk) * 10.0
-		pose["torso"] = 4.0
-		pose["cloak_back"] = 14.0
-		lift = -absf(sin(walk)) * 2.5
+		pose = Moves.girl_run(walk, 0.3)
 	elif place == "stable":
 		facing = 1 if at.x < SPIRIT_AT.x else -1
 		if tool != "":
@@ -1140,9 +1132,11 @@ func _animate_adeline(delta: float) -> void:
 		adeline.scale = Vector2(size * facing, size)
 		adeline.z_index = things[bed]["node"].z_index + 2
 		return
+	var lift: float = pose["_lift"]
+	pose.erase("_lift")
 	adeline.pose = pose
 	adeline.root_offset = Vector2(0.0, lift)
-	adeline.apply()
+	adeline.apply(delta)
 	adeline.position = at
 	adeline.scale = Vector2(size * facing, size)
 	adeline.z_index = int(at.y)

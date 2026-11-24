@@ -73,8 +73,11 @@ The course runs on real physics:
 
 Her little sister rides a small cream pony up and down the meadow between the house and the
 signpost, stops for a rest now and then, and waves and calls hello when Adeline comes near.
-Nobody plays her. For now she and her pony are Adeline's and Spirit's drawings made small and
-recoloured (`scripts/sister.gd`); drawings of their own can replace them later.
+Nobody plays her. She and her pony have drawings of their own (`art/sister`, `art/pony`):
+a five-year-old with a big head and short legs, and a round, shaggy pony with a big head and
+short sturdy legs. A big character made small still looks like a small adult or a toy horse,
+which is why they are not Adeline and Spirit shrunk. The pony uses the same script as Spirit
+(`scripts/horse.gd`) and is told which drawings to wear and where her rider sits.
 
 ## At home
 
@@ -140,6 +143,13 @@ All of Mission 1 is in real art now.
 
 - Adeline, Spirit and the goblins are paper-puppet rigs: each is a set of separate parts
   (head, arm, legs, cloak, tail, club and so on) that the game rotates at the joints.
+- Movement is shared: `scripts/moves.gd` holds the shapes of standing, running, jumping,
+  landing, sitting in the saddle, and a horse's walk, trot and gallop. Adeline, her sister,
+  Spirit, the pony and the race horses all use it.
+- Parts do not jump from one pose to the next. `scripts/rig.gd` eases every joint toward
+  where it should be, so a change of pose blends over a few frames. Cloaks, ponytails and
+  tails are on soft springs: they trail, overshoot and settle, and are thrown back or
+  forward when a character starts or stops.
 - The farmhouse with Spirit's stable, Merlin's hut, Merlin, the flying boat, the signpost
   and the goblin camps are single pictures.
 - The ground and the two layers of hills are long strips that repeat sideways. The hills are

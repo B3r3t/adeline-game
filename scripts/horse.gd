@@ -4,6 +4,7 @@ extends Node2D
 ## and stays back from goblin fights. Built from cutout art.
 
 const RigScript := preload("res://scripts/rig.gd")
+const Moves := preload("res://scripts/moves.gd")
 
 const GALLOP := 620.0
 const SEAT := Vector2(-31.0, -32.0)  # the dip of Spirit's back, measured from the body joint
@@ -17,7 +18,15 @@ var target_x := 0.0
 var speed := 0.0  # ground speed, drives the leg animation
 var stride := 0.0
 var clock := 0.0
+var art := "res://art/spirit"  # which drawings to wear; the pony has her own
+var seat_at := SEAT
+var bit_at := BIT
+var pommel_at := POMMEL
+var hands_at := Vector2(21.0, -19.0)  # the rider's hands, measured from the seat
+var step_rate := 0.035  # how far through a stride each pixel of ground takes her; short legs step faster
 var rig = null
+var was_air := false
+var land_time := 9.0  # seconds since she last landed from a jump
 var rider = null  # a second copy of Adeline's rig that shows only her near leg
 var saddle: Sprite2D = null
 var subject = null  # whoever this horse carries; Adeline unless told otherwise
@@ -49,7 +58,7 @@ func _ready() -> void:
 	rig = Node2D.new()
 	rig.set_script(RigScript)
 	add_child(rig)
-	rig.build("res://art/spirit")
+	rig.build(art)
 	# The far legs sit in shadow.
 	for part in ["leg_front_far_upper", "leg_front_far_lower", "leg_hind_far_upper", "leg_hind_far_lower"]:
 		rig.tint(part, Color(0.72, 0.72, 0.78))
@@ -57,7 +66,8 @@ func _ready() -> void:
 	# under the near legs.
 	var body_sprite: Sprite2D = rig.info["body"]["sprite"]
 	saddle = Sprite2D.new()
-	saddle.texture = load("res://art/spirit/saddle.png")
+	if ResourceLoader.exists(art + "/saddle.png"):
+		saddle.texture = load(art + "/saddle.png")
 	saddle.centered = false
 	saddle.offset = body_sprite.offset
 	saddle.scale = body_sprite.scale
@@ -140,7 +150,7 @@ func _physics_process(delta: float) -> void:
 				state = "idle"
 		_:
 			speed = move_toward(speed, 0.0, 2400.0 * delta)
-	stride += speed * delta * 0.035
+	stride += speed * delta * step_rate
 	_animate()
 	queue_redraw()
 
@@ -153,10 +163,10 @@ func carry(delta: float) -> void:
 	facing = p.facing
 	speed = p.velocity.length()
 	if not wild:
-		_hoofbeats(speed * delta * 0.035, not p.air)
+		_hoofbeats(speed * delta * step_rate, not p.air)
 	if state != "idle" and absf(position.x - p.position.x) < 800.0:
-		_hoofbeats(speed * delta * 0.035, true)
-	stride += speed * delta * 0.035
+		_hoofbeats(speed * delta * step_rate, true)
+	stride += speed * delta * step_rate
 	_animate()
 	queue_redraw()
 
@@ -186,28 +196,28 @@ func _move_to(x: float, pace: float, delta: float) -> bool:
 
 
 func _animate() -> void:
-	var pace := clampf(speed / 560.0, 0.0, 1.0)
 	if rig.scale.x != facing:
 		rig.scale.x = facing
 		rig.reset_physics_interpolation()
-	var pose := { "tail": sin(clock * 2.0) * 5.0 + pace * 26.0, "body": sin(stride) * 2.5 * pace }
-	# A gallop: each leg reaches forward, folds at the joint as it swings through, then pushes back.
-	_leg(pose, "leg_front_near", stride, pace, true)
-	_leg(pose, "leg_front_far", stride + 0.7, pace, true)
-	_leg(pose, "leg_hind_near", stride + 2.1, pace, false)
-	_leg(pose, "leg_hind_far", stride + 2.8, pace, false)
-	var bounce := -absf(sin(stride)) * 6.0 * pace
-	if state == "mounted" and _who().air:
-		# In the air: front legs tuck going up and reach out coming down.
-		var rising: bool = _who().velocity.y < 0.0
-		pose["body"] = -9.0 if rising else 7.0
+	# Walk, trot or gallop, by how fast she is going.
+	var pose: Dictionary = Moves.horse_ground(clock, stride, speed)
+	var in_air: bool = state == "mounted" and _who().air
+	if in_air:
+		Moves.horse_air(pose, _who().velocity.y)
+	# Her legs give as she lands, then push her on.
+	if was_air and not in_air:
+		land_time = 0.0
+	was_air = in_air
+	land_time += get_physics_process_delta_time()
+	if not in_air and land_time < 0.26:
+		var give := sin(land_time / 0.26 * PI)
 		for side in ["near", "far"]:
-			pose["leg_front_%s_upper" % side] = -52.0 if rising else -34.0
-			pose["leg_front_%s_lower" % side] = 84.0 if rising else 22.0
-			pose["leg_hind_%s_upper" % side] = 34.0 if rising else 16.0
-			pose["leg_hind_%s_lower" % side] = 12.0 if rising else -42.0
-		pose["tail"] = 34.0
-		bounce = 0.0
+			pose["leg_front_%s_lower" % side] = float(pose["leg_front_%s_lower" % side]) + 20.0 * give
+			pose["leg_hind_%s_lower" % side] = float(pose["leg_hind_%s_lower" % side]) - 14.0 * give
+		pose["body"] = float(pose["body"]) + 3.5 * give
+		pose["_lift"] = float(pose["_lift"]) + 3.0 * give
+	var bounce: float = pose["_lift"]
+	pose.erase("_lift")
 	rig.pose = pose
 	# On a hill Spirit tips to match it, turning about her hooves so all four stay on the ground.
 	var tilt: float = _who().pitch * facing if state == "mounted" else 0.0
@@ -222,17 +232,6 @@ func _animate() -> void:
 	_tack()
 	rider.pose = { "leg_near_upper": -52.0, "leg_near_lower": 62.0 }
 	rider.apply()
-
-
-func _leg(pose: Dictionary, part: String, phase: float, pace: float, front: bool) -> void:
-	var swing := sin(phase)
-	var through := maxf(0.0, -cos(phase))  # 1 in the middle of the forward swing
-	if front:
-		pose[part + "_upper"] = swing * 36.0 * pace
-		pose[part + "_lower"] = through * 72.0 * pace
-	else:
-		pose[part + "_upper"] = swing * 30.0 * pace
-		pose[part + "_lower"] = (minf(0.0, swing) * 34.0 - through * 26.0 + maxf(0.0, swing) * 10.0) * pace
 
 
 ## Where a spot on Spirit's body picture is right now, with her leaning and bobbing.
@@ -252,11 +251,11 @@ func _tack() -> void:
 	var body: Sprite2D = rig.info["body"]["sprite"]
 	saddle.position = body.position
 	saddle.rotation = body.rotation
-	var from := _body_point(BIT)
-	var to := _body_point(POMMEL)
+	var from := _body_point(bit_at)
+	var to := _body_point(pommel_at)
 	var sag := 9.0
 	if state == "mounted":
-		to = seat() + Vector2(21.0, -19.0).rotated(rig.root_angle)
+		to = seat() + hands_at.rotated(rig.root_angle)
 		sag = 5.0 + 3.0 * sin(stride * 2.0) * clampf(speed / 500.0, 0.0, 1.0)
 	var middle := (from + to) / 2.0 + Vector2(0.0, sag)
 	var points := PackedVector2Array()
@@ -269,7 +268,7 @@ func _tack() -> void:
 
 ## Where a rider sits, relative to Spirit's feet and facing right.
 func seat() -> Vector2:
-	return rig.rest_pos("body") + rig.root_offset + SEAT.rotated(rig.root_angle)
+	return rig.rest_pos("body") + rig.root_offset + seat_at.rotated(rig.root_angle)
 
 
 func _draw() -> void:
