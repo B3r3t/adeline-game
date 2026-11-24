@@ -10,6 +10,8 @@ extends Node2D
 ## Nothing here can be lost: a knocked obstacle costs Spirit some of her speed, and the
 ## course ends with one to three stars.
 
+const HorseScript := preload("res://scripts/horse.gd")
+
 const START_X := 8000.0
 const LENGTH := 14000.0
 const BASE_SPEED := 470.0
@@ -48,6 +50,7 @@ class Rider:
 	var speed := 0.0  # along the ground, while her hooves are on it
 	var grounded := true
 	var impact := 0.0  # how hard she last came down
+	var kick := 1.0  # more than 1 while she is putting on a burst of speed
 
 
 var game = null
@@ -71,6 +74,20 @@ var run_time := 0.0
 var stars := 0
 var last_x := 0.0
 var shadow: Sprite2D = null
+var racing := false  # a race against other horses, rather than the obstacle course
+var rivals: Array = []
+var jumps: Array = []  # where the things to jump are, in order, for the other horses
+var rivals_home := 0  # how many of them have already finished
+var place := 0  # where Spirit came, once a race is over
+var boost := 0.34  # how much burst of speed is saved up, from 0 to 1; a burst uses a third
+var boost_time := 0.0  # how long the burst she is on has left
+
+# The horses Spirit races: name, how grey, what colour, how bright, and how quick.
+const RIVALS := [
+	["Thunder", 1.0, Color(1.0, 1.0, 1.05), 2.4, 1.0],
+	["Daisy", 0.5, Color(1.0, 0.86, 0.5), 2.5, 0.97],
+	["Pepper", 0.9, Color(0.92, 0.92, 1.0), 0.5, 1.03],
+]
 var flight := 0.0  # how long the current time in the air has lasted
 var streak := 0  # rings collected in a row
 
@@ -83,11 +100,18 @@ func clear() -> void:
 	items.clear()
 	hills.clear()
 	ledges.clear()
+	rivals.clear()
+	jumps.clear()
 	shadow = null
 
 
-func start(number: int) -> void:
+func start(number: int, race := false) -> void:
 	clear()
+	racing = race
+	rivals_home = 0
+	place = 0
+	boost = 0.34
+	boost_time = 0.0
 	course = maxi(number, 1)
 	rings_total = 0
 	rings_got = 0
@@ -114,7 +138,19 @@ func pace(axis: float) -> float:
 		speed = lerpf(BASE_SPEED, FAST_SPEED, axis)
 	elif axis < 0.0:
 		speed = lerpf(BASE_SPEED, SLOW_SPEED, -axis)
+	if boost_time > 0.0:
+		speed *= 1.32
 	return speed * (1.0 + 0.05 * minf(course - 1, 6.0))
+
+
+## A burst of speed. Bursts are saved up over time and by collecting rings and jumping cleanly.
+func use_boost() -> void:
+	if finished or boost < 0.33 or boost_time > 0.0:
+		return
+	boost -= 0.33
+	boost_time = 1.5
+	game.sound.play("whoosh", -2.0, 0.05, 1.25)
+	game.sound.shout("adeline", "woohoo", 0.5)
 
 
 # --- The ground --------------------------------------------------------------
@@ -174,7 +210,7 @@ func step(r: Rider, dt: float, target: float) -> void:
 		var m := _slope_behind(r.x)
 		var inv := 1.0 / sqrt(1.0 + m * m)
 		# Along the ground there are two forces: her own legs, and gravity's share of the slope.
-		var legs := clampf((target - r.speed) * DRIVE_GAIN, -BRAKE_MAX, PUSH_MAX)
+		var legs := clampf((target - r.speed) * DRIVE_GAIN * r.kick, -BRAKE_MAX, PUSH_MAX * r.kick)
 		if target <= 0.0:
 			legs = -900.0
 		r.speed += (GRAVITY * m * inv + legs) * dt
@@ -258,7 +294,7 @@ func nominal_speed(x: float) -> float:
 
 func _build() -> void:
 	var rng := RandomNumberGenerator.new()
-	rng.seed = 7000 + course
+	rng.seed = (9000 if racing else 7000) + course
 	roughness = minf(0.7 + 0.1 * (course - 1), 1.15)
 	hills = [
 		[90.0, TAU / rng.randf_range(1500.0, 1900.0), rng.randf() * TAU],
@@ -269,6 +305,9 @@ func _build() -> void:
 	var kinds := ["fence", "ring_low", "bale", "ring_mid", "log", "fence_ring", "arc", "ledge"]
 	if course >= 2:
 		kinds.append_array(["ring_high", "arc", "fence_ring", "ledge"])
+	if racing:
+		# A race is mostly jumps, with a few rings to earn bursts of speed.
+		kinds = ["fence", "bale", "log", "fence", "bale", "ring_low", "ring_mid", "ledge"]
 	var plan: Array = []
 	var x := START_X + 950.0
 	var previous := ""
@@ -326,6 +365,84 @@ func _build() -> void:
 					_add_ring(p.x, p.y - RIDER_HEIGHT)
 	var arch := _sprite("finish", finish_x)
 	arch.z_index = 0
+	if racing:
+		_add_rivals(rng)
+
+
+## The other horses. Each runs on the same physics as Spirit, in a lane a little further back.
+func _add_rivals(rng: RandomNumberGenerator) -> void:
+	for item in items:
+		if item["kind"] != "ring":
+			jumps.append(float(item["x"]))
+	jumps.sort()
+	for i in RIVALS.size():
+		var spec: Array = RIVALS[i]
+		var who := { "position": Vector2(START_X, ground_y(START_X)), "velocity": Vector2.ZERO, "air": false, "pitch": 0.0, "facing": 1 }
+		var node := Node2D.new()
+		node.set_script(HorseScript)
+		node.game = game
+		node.wild = true
+		node.subject = who
+		add_child(node)
+		node.state = "mounted"
+		node.set_coat(float(spec[1]), spec[2], float(spec[3]))
+		# One runs on the near side of Spirit and two on the far side, each a little smaller
+		# the further away it is.
+		var lane: float = [-15.0, 13.0, -29.0][i]
+		var size: float = [0.93, 1.05, 0.87][i]
+		node.scale = Vector2(size, size)
+		node.z_index = 1 if lane > 0.0 else 0
+		# Now and then a horse knocks a jump. Which ones is settled before the race starts.
+		var fumbles := {}
+		for j in jumps.size():
+			if rng.randf() < 0.2 + 0.03 * i:
+				fumbles[j] = true
+		rivals.append({ "node": node, "who": who, "rider": _rider_at(START_X, 0.0), "pace": float(spec[4]), "lane": lane, "want": [90.0, -210.0, -50.0][i], "next": 0, "slow": 0.0, "fumbles": fumbles, "home": false })
+
+
+func _run_rivals(delta: float) -> void:
+	for rival in rivals:
+		var r: Rider = rival["rider"]
+		var target: float = BASE_SPEED * (1.0 + 0.05 * minf(course - 1, 6.0)) * float(rival["pace"])
+		# A horse far in front eases off and one far behind digs in, so the race stays close.
+		# Each has its own idea of where it wants to be, and that drifts, so they jostle.
+		var want: float = float(rival["want"]) + 230.0 * sin(run_time * 0.23 + float(rival["lane"]))
+		target *= clampf(1.0 - (r.x - rider.x - want) / 2600.0, 0.88, 1.24)
+		rival["slow"] = maxf(float(rival["slow"]) - delta, 0.0)
+		if float(rival["slow"]) > 0.0:
+			target *= 0.55
+		if r.x >= finish_x:
+			target = 0.0
+			if not rival["home"]:
+				rival["home"] = true
+				if not finished:
+					rivals_home += 1
+		var n: int = rival["next"]
+		if n < jumps.size() and r.grounded and float(jumps[n]) - r.x < r.speed * 0.34 + 24.0:
+			rival["next"] = n + 1
+			jump(r)
+			if rival["fumbles"].has(n):
+				r.vy *= 0.45  # too low: it clips the jump and loses ground
+				rival["slow"] = 0.9
+		step(r, delta, target)
+		var who: Dictionary = rival["who"]
+		who["position"] = Vector2(r.x, r.y + float(rival["lane"]))
+		who["velocity"] = Vector2(r.vx, r.vy)
+		who["air"] = not r.grounded
+		var lean := atan(slope(r.x))
+		if not r.grounded:
+			lean = clampf(atan2(r.vy, maxf(r.vx, 60.0)) * 0.45, -0.5, 0.5)
+		who["pitch"] = lerp_angle(float(who["pitch"]), lean, 1.0 - exp(-12.0 * delta))
+		rival["node"].carry(delta)
+
+
+## Where Spirit is in the race right now: 1 for first.
+func rank() -> int:
+	var ahead := 0
+	for rival in rivals:
+		if rival["rider"].x > rider.x:
+			ahead += 1
+	return ahead + 1
 
 
 ## The ground is one long strip of the grass picture, bent to follow the hills, with soil
@@ -562,6 +679,13 @@ func _physics_process(delta: float) -> void:
 	if not active:
 		return
 	_place_shadow()
+	_run_rivals(delta)
+	boost_time = maxf(boost_time - delta, 0.0)
+	rider.kick = 2.4 if boost_time > 0.0 else 1.0
+	if not finished:
+		boost = minf(boost + 0.018 * delta, 1.0)
+		if boost_time > 0.0 and rider.grounded and int(run_time * 14.0) != int((run_time + delta) * 14.0):
+			_dust(Vector2(rider.x - 50.0, rider.y), 0.7)
 	if rider.impact > 0.0:
 		_dust(Vector2(rider.x, rider.y), clampf(rider.impact / 500.0, 0.4, 1.4))
 		game.sound.play("land", clampf(-14.0 + rider.impact / 60.0, -14.0, -2.0), 0.08)
@@ -596,6 +720,7 @@ func _physics_process(delta: float) -> void:
 		elif px > ix + 130.0:
 			item["done"] = true
 			jumps_clean += 1
+			boost = minf(boost + 0.09, 1.0)
 	# Things left far behind are tidied away.
 	for item in items:
 		if item.has("node") and item["node"] != null and px > float(item["x"]) + 1700.0:
@@ -690,6 +815,7 @@ func _dust(at: Vector2, strength: float) -> void:
 
 func _collect(item: Dictionary) -> void:
 	rings_got += 1
+	boost = minf(boost + 0.12, 1.0)
 	# Each ring in a row rings a little higher.
 	game.sound.play("chime", -4.0, 0.0, 1.0 + 0.06 * minf(streak, 8.0), 0.0)
 	streak += 1
@@ -718,4 +844,8 @@ func _finish() -> void:
 		stars = 2
 	if share >= 0.85 and stumbles <= 1:
 		stars = 3
+	if racing:
+		# In a race the stars are for where she came.
+		place = rivals_home + 1
+		stars = 3 if place == 1 else (2 if place == 2 else 1)
 	game.on_ride_finished(course, stars)

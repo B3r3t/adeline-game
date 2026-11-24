@@ -35,6 +35,7 @@ func _layout() -> void:
 		"fireball": { "center": Vector2(right - 68.0 - 58.0, bottom - 68.0 - 146.0), "radius": 62.0, "action": "fireball" },
 		"shield": { "center": Vector2(right - 68.0 - 200.0, bottom - 62.0 - 138.0), "radius": 58.0, "action": "shield" },
 		"interact": { "center": Vector2(m + 70.0 + 78.0, bottom - 70.0 - 150.0), "radius": 60.0, "action": "interact" },
+		"boost": { "center": Vector2(right - 68.0 - 58.0, bottom - 68.0 - 146.0), "radius": 62.0, "action": "boost" },
 	}
 	queue_redraw()
 
@@ -43,7 +44,9 @@ func _visible(id: String) -> bool:
 	if game == null or game.input_locked():
 		return false
 	if game.mode == "ride":
-		return id == "left" or id == "right" or id == "jump"
+		return id == "left" or id == "right" or id == "jump" or id == "boost"
+	if id == "boost":
+		return false
 	if id == "shield":
 		return game.has_shield() and not game.player.mounted
 	if id == "interact":
@@ -152,6 +155,14 @@ func _draw() -> void:
 				draw_circle(c + Vector2(0.0, -r * 0.14), r * 0.17, Color(1.0, 0.85, 0.3))
 				_label(c + Vector2(0.0, r * 0.6), "FIRE")
 				_cooldown(c, r, game.player.fireball_cd / game.player.FIREBALL_COOLDOWN, Color(1.0, 0.8, 0.3))
+			"boost":
+				# Two arrows, lit when there is a burst of speed saved up.
+				var ready: bool = game.ride.boost >= 0.33 and game.ride.boost_time <= 0.0
+				var ink := Color(1.0, 0.9, 0.35) if ready else Color(1.0, 1.0, 1.0, 0.3)
+				for k in 2:
+					var o := c + Vector2(-r * 0.22 + k * r * 0.36, -r * 0.12)
+					draw_colored_polygon(PackedVector2Array([o + Vector2(-r * 0.16, -r * 0.26), o + Vector2(r * 0.16, 0.0), o + Vector2(-r * 0.16, r * 0.26)]), ink)
+				_label(c + Vector2(0.0, r * 0.6), "BOOST")
 			"shield":
 				draw_arc(c + Vector2(0.0, -r * 0.12), r * 0.32, 0.0, TAU, 24, Color(0.6, 0.85, 1.0), 6.0)
 				_label(c + Vector2(0.0, r * 0.62), "SHIELD")

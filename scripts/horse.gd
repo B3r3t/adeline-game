@@ -20,6 +20,22 @@ var clock := 0.0
 var rig = null
 var rider = null  # a second copy of Adeline's rig that shows only her near leg
 var saddle: Sprite2D = null
+var subject = null  # whoever this horse carries; Adeline unless told otherwise
+var wild := false  # a horse with no saddle and no rider, run by the race
+
+# Recolours a horse's coat: how grey it goes, what colour it is washed with, how bright.
+const COAT_SHADER := "
+shader_type canvas_item;
+uniform float grey = 0.0;
+uniform vec3 wash = vec3(1.0);
+uniform float gain = 1.0;
+void fragment() {
+	vec4 c = texture(TEXTURE, UV);
+	float l = dot(c.rgb, vec3(0.3, 0.59, 0.11));
+	c.rgb = clamp(mix(c.rgb, vec3(l), grey) * wash * gain, 0.0, 1.0);
+	COLOR = c;
+}
+"
 var reins: Array = []  # two lines: a dark edge and the leather on top
 
 # Spots on Spirit's body picture, in its own pixels.
@@ -91,8 +107,24 @@ func set_mounted(on: bool) -> void:
 	z_index = 0
 
 
+func _who():
+	return subject if subject != null else game.player
+
+
+func set_coat(grey: float, wash: Color, gain: float) -> void:
+	var shader := Shader.new()
+	shader.code = COAT_SHADER
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("grey", grey)
+	material.set_shader_parameter("wash", Vector3(wash.r, wash.g, wash.b))
+	material.set_shader_parameter("gain", gain)
+	for part in rig.info:
+		rig.info[part]["sprite"].material = material
+
+
 func _physics_process(delta: float) -> void:
-	if state == "mounted":
+	if state == "mounted" or wild:
 		return  # Adeline moves Spirit while she rides, so the two never drift apart
 	clock += delta
 	var p = game.player
@@ -115,11 +147,12 @@ func _physics_process(delta: float) -> void:
 ## Called by Adeline each tick while she rides, right after she has moved.
 func carry(delta: float) -> void:
 	clock += delta
-	var p = game.player
+	var p = _who()
 	position = p.position
 	facing = p.facing
 	speed = p.velocity.length()
-	_hoofbeats(speed * delta * 0.035, not p.air)
+	if not wild:
+		_hoofbeats(speed * delta * 0.035, not p.air)
 	if state != "idle" and absf(position.x - p.position.x) < 800.0:
 		_hoofbeats(speed * delta * 0.035, true)
 	stride += speed * delta * 0.035
@@ -163,9 +196,9 @@ func _animate() -> void:
 	_leg(pose, "leg_hind_near", stride + 2.1, pace, false)
 	_leg(pose, "leg_hind_far", stride + 2.8, pace, false)
 	var bounce := -absf(sin(stride)) * 6.0 * pace
-	if state == "mounted" and game.player.air:
+	if state == "mounted" and _who().air:
 		# In the air: front legs tuck going up and reach out coming down.
-		var rising: bool = game.player.velocity.y < 0.0
+		var rising: bool = _who().velocity.y < 0.0
 		pose["body"] = -9.0 if rising else 7.0
 		for side in ["near", "far"]:
 			pose["leg_front_%s_upper" % side] = -52.0 if rising else -34.0
@@ -176,7 +209,7 @@ func _animate() -> void:
 		bounce = 0.0
 	rig.pose = pose
 	# On a hill Spirit tips to match it, turning about her hooves so all four stay on the ground.
-	var tilt: float = game.player.pitch * facing if state == "mounted" else 0.0
+	var tilt: float = _who().pitch * facing if state == "mounted" else 0.0
 	var joint: Vector2 = rig.rest_pos("body")
 	rig.root_angle = tilt
 	rig.root_offset = Vector2(0.0, bounce) + joint.rotated(tilt) - joint
@@ -210,6 +243,11 @@ func _body_point(pixel: Vector2) -> Vector2:
 ## Keeps the saddle on her back and hangs the reins from the bit: to Adeline's hands
 ## while she rides, and looped back to the saddle when she does not.
 func _tack() -> void:
+	saddle.visible = not wild
+	for line in reins:
+		line.visible = not wild
+	if wild:
+		return
 	var body: Sprite2D = rig.info["body"]["sprite"]
 	saddle.position = body.position
 	saddle.rotation = body.rotation
@@ -234,6 +272,8 @@ func seat() -> Vector2:
 
 
 func _draw() -> void:
+	if wild:
+		return
 	if state != "mounted" and game.mode == "play" and absf(game.player.position.x - position.x) < 260.0:
 		var y := -170.0
 		draw_string_outline(font, Vector2(-60.0, y), NAME, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 20, 5, Color(0.0, 0.0, 0.0, 0.5))

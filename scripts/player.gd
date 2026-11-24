@@ -195,6 +195,8 @@ func _ride(delta: float) -> void:
 			coyote = 0.0
 		if Input.is_action_just_released("jump") and s.vy < -260.0:
 			s.vy = -260.0  # letting go early makes a shorter hop
+		if Input.is_action_just_pressed("boost"):
+			r.use_boost()
 	r.step(s, delta, r.pace(dir))
 	if s.grounded:
 		coyote = 0.1

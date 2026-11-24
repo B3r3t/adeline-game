@@ -90,26 +90,41 @@ func _draw() -> void:
 
 func _draw_ride(s: Vector2) -> void:
 	var r = game.ride
-	_text(Vector2(40.0, 62.0), "Course %d" % r.course, 26, Color(1.0, 0.92, 0.5))
-	_text(Vector2(0.0, 58.0), "Rings %d of %d" % [r.rings_got, r.rings_total], 30, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, s.x)
+	var places := ["1st", "2nd", "3rd", "4th"]
+	_text(Vector2(40.0, 62.0), ("Race %d" if r.racing else "Course %d") % r.course, 26, Color(1.0, 0.92, 0.5))
+	if r.racing:
+		_text(Vector2(0.0, 58.0), "%s of 4" % places[clampi(r.rank() - 1, 0, 3)], 34, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, s.x)
+	else:
+		_text(Vector2(0.0, 58.0), "Rings %d of %d" % [r.rings_got, r.rings_total], 30, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, s.x)
+	# Bursts of speed saved up: three to a full bar.
+	_text(Vector2(40.0, 98.0), "Boost", 18, Color.WHITE)
+	for i in 3:
+		var cell := Rect2(104.0 + i * 46.0, 84.0, 40.0, 14.0)
+		draw_rect(cell, Color(0.0, 0.0, 0.0, 0.35))
+		draw_rect(Rect2(cell.position, Vector2(cell.size.x * clampf(r.boost * 3.0 - i, 0.0, 1.0), cell.size.y)), Color(1.0, 0.85, 0.2))
+		draw_rect(cell, Color(1.0, 1.0, 1.0, 0.6), false, 1.5)
 	# How far along the course Spirit is.
 	var bar := Rect2(s.x / 2.0 - 220.0, 76.0, 440.0, 10.0)
 	var done := clampf((game.player.position.x - r.START_X) / (r.finish_x - r.START_X), 0.0, 1.0)
 	draw_rect(bar, Color(0.0, 0.0, 0.0, 0.3))
 	draw_rect(Rect2(bar.position, Vector2(bar.size.x * done, bar.size.y)), Color(1.0, 0.85, 0.2))
 	if not r.finished and r.run_time < 7.0:
-		_text(Vector2(0.0, 122.0), "Tap JUMP to leap, hold it to jump higher. Ride through the rings!", 21, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
+		var tip := "Jump cleanly and collect rings to save up BOOST. Be first to the finish!" if r.racing else "Tap JUMP to leap, hold it to jump higher. Ride through the rings! BOOST gives a burst of speed."
+		_text(Vector2(0.0, 132.0), tip, 21, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
 	if r.finished and r.finish_time >= 0.8:
 		var panel := Rect2(s.x / 2.0 - 360.0, s.y * 0.16, 720.0, s.y * 0.6)
 		draw_rect(panel, Color(0.08, 0.1, 0.2, 0.85))
 		draw_rect(panel, Color(1.0, 0.9, 0.5, 0.9), false, 3.0)
-		_text(Vector2(panel.position.x, panel.position.y + 64.0), "Course %d finished!" % r.course, 42, Color(1.0, 0.92, 0.5), HORIZONTAL_ALIGNMENT_CENTER, panel.size.x)
+		var headline := "Course %d finished!" % r.course
+		if r.racing:
+			headline = "Spirit won the race!" if r.place == 1 else "Spirit came %s!" % places[clampi(r.place - 1, 0, 3)]
+		_text(Vector2(panel.position.x, panel.position.y + 64.0), headline, 42, Color(1.0, 0.92, 0.5), HORIZONTAL_ALIGNMENT_CENTER, panel.size.x)
 		for i in 3:
 			_star(Vector2(s.x / 2.0 + (i - 1) * 110.0, panel.position.y + 140.0), 44.0, i < r.stars)
 		var line := "Rings %d of %d     Clean jumps %d     Bumps %d" % [r.rings_got, r.rings_total, r.jumps_clean, r.stumbles]
 		_text(Vector2(panel.position.x, panel.position.y + 226.0), line, 24, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, panel.size.x)
-		_button(game.again_rect(), "Ride again", 28, Color(0.25, 0.4, 0.75, 0.95))
-		_button(game.next_rect(), "Next course", 28, Color(0.3, 0.6, 0.35, 0.95))
+		_button(game.again_rect(), "Race again" if r.racing else "Ride again", 28, Color(0.25, 0.4, 0.75, 0.95))
+		_button(game.next_rect(), "Next race" if r.racing else "Next course", 28, Color(0.3, 0.6, 0.35, 0.95))
 
 
 func _draw_title(s: Vector2) -> void:
@@ -119,6 +134,7 @@ func _draw_title(s: Vector2) -> void:
 	var saved: bool = game.has_save()
 	_button(game.adventure_rect(), "Continue the adventure" if saved else "Start the adventure", 28, Color(0.25, 0.4, 0.75, 0.95))
 	_button(game.ride_rect(), "Ride with Spirit", 28, Color(0.3, 0.6, 0.35, 0.95))
+	_button(game.race_rect(), "Horse race", 24, Color(0.75, 0.5, 0.15, 0.95))
 	if saved:
 		var armed: bool = game.new_game_armed
 		_button(game.new_game_rect(), "Tap again to erase progress" if armed else "New adventure", 22, Color(0.6, 0.2, 0.2, 0.85) if armed else Color(1.0, 1.0, 1.0, 0.16))

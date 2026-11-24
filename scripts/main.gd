@@ -177,6 +177,7 @@ func _setup_input() -> void:
 	_add_action("fireball", [KEY_K, KEY_X])
 	_add_action("shield", [KEY_L, KEY_C])
 	_add_action("interact", [KEY_E, KEY_ENTER])
+	_add_action("boost", [KEY_K, KEY_X, KEY_SHIFT])
 
 
 func _add_action(action: String, keys: Array) -> void:
@@ -227,7 +228,9 @@ func _add_strip(art: String, world_height: float, bottom_y: float, depth: int) -
 	sprite.centered = false
 	sprite.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	sprite.region_enabled = true
-	sprite.region_rect = Rect2(0.0, 0.0, tex.get_width() * 8.0, tex.get_height())
+	# Two pixels are left off the top: with the picture repeating, its bottom row would
+	# otherwise bleed in there as a faint line across the sky.
+	sprite.region_rect = Rect2(0.0, 2.0, tex.get_width() * 8.0, tex.get_height() - 2.0)
 	var k := world_height / tex.get_height()
 	sprite.scale = Vector2(k, k)
 	sprite.position = Vector2(STRIP_START, bottom_y - world_height)
@@ -281,7 +284,7 @@ func _add_wall(rect: Rect2) -> void:
 # --- Saved progress ---------------------------------------------------------
 
 func _default_data() -> Dictionary:
-	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {} }
+	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {} }
 
 
 func has_save() -> bool:
@@ -753,6 +756,11 @@ func ride_rect() -> Rect2:
 	return Rect2(s.x / 2.0 + 20.0, s.y * 0.56, 380.0, 110.0)
 
 
+func race_rect() -> Rect2:
+	var s := get_viewport_rect().size
+	return Rect2(s.x / 2.0 + 20.0, s.y * 0.56 + 124.0, 380.0, 54.0)
+
+
 func new_game_rect() -> Rect2:
 	var s := get_viewport_rect().size
 	return Rect2(s.x / 2.0 - 400.0, s.y * 0.56 + 124.0, 380.0, 54.0)
@@ -808,11 +816,11 @@ func next_rect() -> Rect2:
 
 # --- The riding course -------------------------------------------------------
 
-func start_ride(number: int) -> void:
+func start_ride(number: int, race := false) -> void:
 	_place_player()
 	mode = "ride"
 	new_game_armed = false
-	data["ride_course"] = number
+	data["race_course" if race else "ride_course"] = number
 	_save()
 	zoom = RIDE_ZOOM
 	camera.zoom = Vector2(zoom, zoom)
@@ -822,14 +830,14 @@ func start_ride(number: int) -> void:
 	horse.place(ride.START_X)
 	player.mounted = true
 	horse.set_mounted(true)
-	ride.start(number)
+	ride.start(number, race)
 	_update_camera(0.0, true)
 	sound.shout("adeline", "lets_ride", 1.0, true)
 	sound.play("whinny", -6.0)
 
 
 func on_ride_finished(number: int, stars: int) -> void:
-	var best: Dictionary = data["ride_stars"]
+	var best: Dictionary = data["race_stars" if ride.racing else "ride_stars"]
 	var key := str(number)
 	if stars > int(best.get(key, 0)):
 		best[key] = stars
@@ -867,6 +875,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			sound.play("chime", -4.0)
 		elif has_pos and ride_rect().has_point(pos):
 			start_ride(int(data["ride_course"]))
+		elif has_pos and race_rect().has_point(pos):
+			start_ride(int(data["race_course"]), true)
 		elif has_save() and has_pos and new_game_rect().has_point(pos):
 			if new_game_armed:
 				_start(true)
@@ -881,9 +891,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	elif mode == "ride":
 		if ride.finished and ride.finish_time >= 0.8 and has_pos:
 			if again_rect().has_point(pos):
-				start_ride(ride.course)
+				start_ride(ride.course, ride.racing)
 			elif next_rect().has_point(pos):
-				start_ride(ride.course + 1)
+				start_ride(ride.course + 1, ride.racing)
 	elif defeated and defeat_time >= 1.0:
 		_retry()
 

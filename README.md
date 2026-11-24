@@ -44,6 +44,17 @@ player does the jumping.
 - "Next course" gives a new layout that is a little faster and hillier. A course number always
   gives the same layout, so it can be practised.
 
+**Boost.** Both riding games have a BOOST button. A burst lasts a second and a half and makes
+Spirit about a third faster. Bursts are saved up, three to a full bar: slowly over time, and
+faster by collecting rings and jumping cleanly.
+
+**Horse race.** "Horse race" on the title screen races Spirit against three other horses
+(Thunder, Daisy and Pepper) over hills and jumps. They run on the same physics as Spirit, each
+in its own lane, and now and then one clips a jump and loses ground. A horse far in front
+eases off and one far behind digs in, so the race stays close. Stars are for where she
+comes: three for first, two for second. Tested with a scripted rider: clean jumps with boost
+wins, clean jumps without boost comes second, and hitting every jump comes third.
+
 The course runs on real physics:
 
 - The ground rolls. Gravity slows Spirit on the way up a hill and speeds her up on the way
