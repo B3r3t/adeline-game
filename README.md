@@ -90,6 +90,18 @@ The course runs on real physics:
   reached at an easy pace.
 - `scripts/ride.gd` holds all of it. The forces and speeds are at the top.
 
+### The crowd at a race
+
+People come to watch a race: a few groups here and there along the track and a bigger
+gathering either side of the finish. They stand behind a rope on the far side, hop and wave
+as Spirit comes by, and give a light cheer; there is a bigger cheer when she finishes. The
+cheers are four recorded voices layered at different pitches over clapping
+(`crowd` in `art_src/build_audio.py`). The spectators are sixteen separate pictures
+(`art/props/crowd_*.png`), put into groups by `_add_crowds` in `scripts/ride.gd`.
+
+The finish gate is drawn in two layers, so the horses ride through it: the far post and the
+banner behind them, the near post in front.
+
 ## Adeline's little sister
 
 Her little sister rides a small cream pony up and down the meadow between the house and the

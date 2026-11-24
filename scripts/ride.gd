@@ -31,6 +31,8 @@ const KNOCK_KEEPS := 0.6  # the share of her speed she keeps after clipping some
 const TICK := 1.0 / 60.0  # the step used when working out a jump in advance
 
 const RIDER_HEIGHT := 112.0  # how far above Spirit's hooves the middle of Adeline is
+const FINISH_SIZE := 1.5  # the finish gate is drawn this much bigger, so a rider fits under its banner
+const CROWD_FACES := 16  # how many different spectators there are pictures of
 const RING_OPENING := 112.0  # how far above or below a ring's middle she can be and still get it
 const RING_REACH := 72.0  # Spirit is long: the ring counts from her nose reaching it to her tail leaving it
 const RING_AIM := 29.0  # how closely a worked-out jump must thread a ring when the course is built
@@ -69,6 +71,8 @@ var jumps_clean := 0
 var stumbles := 0
 var air_time := 0.0
 var finish_x := 0.0
+var crowds: Array = []  # the people watching a race: where each group is, and who is in it
+var crowd_clock := 0.0
 var finish_time := 0.0
 var run_time := 0.0
 var stars := 0
@@ -101,6 +105,7 @@ func clear() -> void:
 	hills.clear()
 	ledges.clear()
 	rivals.clear()
+	crowds.clear()
 	jumps.clear()
 	shadow = null
 
@@ -363,10 +368,116 @@ func _build() -> void:
 				if path.size() >= 8:
 					var p: Vector2 = path[int(path.size() * 0.45)]
 					_add_ring(p.x, p.y - RIDER_HEIGHT)
-	var arch := _sprite("finish", finish_x)
-	arch.z_index = 0
+	if racing:
+		_add_crowds(plan)
+	# The finish is a gate to ride through, so it is drawn in two layers: the far post and
+	# the banner behind the horses, and the near post in front of them.
+	var gate: Texture2D = load("res://art/props/finish.png")
+	var size := gate.get_size()
+	var split := size.x * 0.8
+	for near in [false, true]:
+		var part := Sprite2D.new()
+		part.texture = gate
+		part.region_enabled = true
+		part.region_rect = Rect2(split, 0.0, size.x - split, size.y) if near else Rect2(0.0, 0.0, split, size.y)
+		part.scale = Vector2(ART_SCALE, ART_SCALE) * FINISH_SIZE
+		part.offset = Vector2(0.0, -size.y / 2.0)
+		var middle := (split + size.x) / 2.0 if near else split / 2.0
+		part.position = Vector2(finish_x + (middle - size.x / 2.0) * ART_SCALE * FINISH_SIZE, ground_y(finish_x) + 4.0)
+		part.z_index = 3 if near else 0
+		add_child(part)
 	if racing:
 		_add_rivals(rng)
+
+
+## People who have come to watch the race: a few here and there along the track, and a
+## bigger gathering at the finish. They stand behind a rope on the far side, hop and wave
+## as Spirit comes by, and give a cheer.
+func _add_crowds(plan: Array) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 500 + course  # their own dice, so the race itself is laid out as before
+	var spots: Array = []
+	var x := START_X + 620.0
+	while x < finish_x - 900.0:
+		spots.append([x, rng.randi_range(3, 4), false])
+		x += rng.randf_range(1500.0, 2100.0)
+	for gap in [-560.0, -280.0, 250.0, 520.0]:
+		spots.append([finish_x + gap, rng.randi_range(5, 6), true])
+	for spot in spots:
+		var at: float = spot[0]
+		var big: bool = spot[2]
+		if not big:
+			# Not where there is something to jump, and not on a ledge: look a little further
+			# along until there is room.
+			var found := false
+			for attempt in 8:
+				var here := at + attempt * 130.0
+				var clear := here < finish_x - 800.0
+				for item in plan:
+					var from: float = item[1]
+					var reach := 900.0 if str(item[0]) == "ledge" else 300.0
+					if here > from - 300.0 and here < from + reach:
+						clear = false
+				if clear:
+					at = here
+					found = true
+					break
+			if not found:
+				continue
+		var count: int = spot[1]
+		var people: Array = []
+		var width := count * 44.0
+		# Tallest at the back, so the rope and the little ones are not hidden.
+		for i in count:
+			var who := Sprite2D.new()
+			who.texture = load("res://art/props/crowd_%d.png" % rng.randi_range(0, CROWD_FACES - 1))
+			who.scale = Vector2(ART_SCALE, ART_SCALE) * 0.92
+			who.flip_h = rng.randf() < 0.4
+			who.offset = Vector2(0.0, -who.texture.get_size().y / 2.0)
+			var px := at - width / 2.0 + (i + 0.5) * 44.0 + rng.randf_range(-7.0, 7.0)
+			who.position = Vector2(px, ground_y(px) + 3.0)
+			add_child(who)
+			people.append([who, who.position.y, rng.randf() * TAU])
+		# The rope they stand behind.
+		var rope := Line2D.new()
+		rope.width = 3.0
+		rope.default_color = Color(0.86, 0.74, 0.5)
+		var from_x := at - width / 2.0 - 26.0
+		var posts := int(ceil((width + 52.0) / 58.0))
+		for i in posts + 1:
+			var px := from_x + (width + 52.0) * i / posts
+			var py := ground_y(px) + 3.0
+			var post := Line2D.new()
+			post.width = 7.0
+			post.default_color = Color(0.45, 0.3, 0.18)
+			post.points = PackedVector2Array([Vector2(px, py), Vector2(px, py - 34.0)])
+			post.begin_cap_mode = Line2D.LINE_CAP_ROUND
+			post.end_cap_mode = Line2D.LINE_CAP_ROUND
+			add_child(post)
+			rope.add_point(Vector2(px, py - 28.0))
+			if i < posts:
+				rope.add_point(Vector2(px + (width + 52.0) / posts / 2.0, ground_y(px + 29.0) + 3.0 - 22.0))  # it sags
+		add_child(rope)
+		crowds.append({ "x": at, "people": people, "cheered": false, "big": big })
+
+
+func _crowd_frame(delta: float) -> void:
+	crowd_clock += delta
+	for crowd in crowds:
+		var away := absf(rider.x - float(crowd["x"]))
+		var excited := away < 640.0 or (finished and bool(crowd["big"]))
+		for person in crowd["people"]:
+			var who: Sprite2D = person[0]
+			var phase: float = person[2]
+			if excited:
+				who.position.y = float(person[1]) - absf(sin(crowd_clock * 7.0 + phase)) * 8.0
+				who.rotation = sin(crowd_clock * 5.0 + phase) * 0.05
+			else:
+				who.position.y = float(person[1]) - (0.5 + 0.5 * sin(crowd_clock * 2.0 + phase)) * 1.5
+				who.rotation = 0.0
+		if not crowd["cheered"] and rider.x > float(crowd["x"]) - 430.0 and not finished:
+			crowd["cheered"] = true
+			game.sound.play("crowd_cheer", -9.0 if crowd["big"] else -12.0, 0.03, 1.0, 0.6)
 
 
 ## The other horses. Each runs on the same physics as Spirit, in a lane a little further back.
@@ -681,6 +792,7 @@ func _physics_process(delta: float) -> void:
 		return
 	_place_shadow()
 	_run_rivals(delta)
+	_crowd_frame(delta)
 	boost_time = maxf(boost_time - delta, 0.0)
 	rider.kick = 2.4 if boost_time > 0.0 else 1.0
 	if not finished:
@@ -849,4 +961,5 @@ func _finish() -> void:
 		# In a race the stars are for where she came.
 		place = rivals_home + 1
 		stars = 3 if place == 1 else (2 if place == 2 else 1)
+		game.sound.play("crowd_big", -5.0, 0.0)
 	game.on_ride_finished(course, stars)

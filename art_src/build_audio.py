@@ -164,6 +164,44 @@ def clop(variant):
     return fade(lowpass(body + weight + touch + grass, 5000), 0.002, 0.05)
 
 
+def voice_wave(folder, stem):
+    """A recorded voice as plain numbers, one channel, at our sample rate."""
+    raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-i", os.path.join(folder, stem + ".mp3"), "-f", "f32le", "-ac", "1", "-ar", str(SR), "-"], capture_output=True, check=True).stdout
+    wave = np.frombuffer(raw, dtype=np.float32).astype(np.float64)
+    return wave / (np.abs(wave).max() + 1e-9)
+
+
+def crowd(folder, seed, seconds, voices, claps):
+    """A small crowd cheering: a handful of recorded cheers layered at different pitches and
+    moments so four voices sound like more people, over a patter of clapping, all a little
+    muffled as if heard from across a field."""
+    local = np.random.default_rng(seed)
+    n = int(SR * seconds)
+    out = np.zeros(n)
+    stems = ["c_kid", "c_man", "c_man2", "c_girl"]
+    for k in range(voices):
+        wave = voice_wave(folder, stems[(k + seed) % len(stems)])
+        rate = local.uniform(0.86, 1.2)  # faster and higher, or slower and lower: another person
+        wave = np.interp(np.arange(0, len(wave) - 1, rate), np.arange(len(wave)), wave)
+        start = int(local.uniform(0.0, max(1.0, n - len(wave) * 0.7)))
+        end = min(n, start + len(wave))
+        out[start:end] += wave[: end - start] * local.uniform(0.3, 0.7)
+    for _ in range(claps):
+        length = int(SR * 0.05)
+        clap = bandpass(local.standard_normal(length), local.uniform(800, 1300), local.uniform(2800, 3800)) * env_decay(length, local.uniform(0.005, 0.011))
+        start = int(local.uniform(0, n - length))
+        out[start:start + length] += clap / (np.abs(clap).max() + 1e-9) * local.uniform(0.08, 0.26)
+    # It swells and dies away, and the far side of the field takes the edge off it.
+    swell = np.minimum(1.0, np.arange(n) / (SR * 0.35)) * np.minimum(1.0, (n - np.arange(n)) / (SR * 0.9))
+    out = lowpass(out * swell, 5200)
+    for delay, share in [(0.07, 0.28), (0.15, 0.16)]:
+        echo = np.zeros(n)
+        shift = int(SR * delay)
+        echo[shift:] = out[:-shift] * share
+        out = out + echo
+    return fade(out, 0.02, 0.3)
+
+
 def land():
     first = clop(1)
     rng.standard_normal(2 * int(SR * 0.16))  # the old hoofbeat used these; keeps later effects unchanged
@@ -398,6 +436,8 @@ def main():
     sounds["burst"] = [save(out, "burst", burst(), 0.85)]
     sounds["hit"] = [save(out, "hit", hit(), 0.8)]
     sounds["clop"] = [save(out, "clop_%d" % v, clop(v), 0.6) for v in range(6)]
+    sounds["crowd_cheer"] = [save(out, "crowd_%d" % v, crowd(raw, 11 + v, 2.9, 5, 60), 0.7) for v in range(3)]
+    sounds["crowd_big"] = [save(out, "crowd_big", crowd(raw, 31, 4.6, 11, 190), 0.75)]
     sounds["clop_far"] = sounds["clop"]  # other horses: the same steps, limited separately
     rng.standard_normal(6 * int(SR * 0.16))  # the old hoofbeats used these; keeps later effects unchanged
     sounds["land"] = [save(out, "land", land(), 0.85)]
