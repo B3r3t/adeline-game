@@ -233,7 +233,7 @@ func _sky(delta: float) -> void:
 func _ride(delta: float) -> void:
 	var r = game.ride
 	var s = r.rider
-	var locked: bool = game.input_locked()
+	var locked: bool = game.input_locked() or r.holding()
 	var dir := 0.0 if locked else Input.get_axis("move_left", "move_right")
 	facing = 1
 	if not locked:
@@ -250,7 +250,8 @@ func _ride(delta: float) -> void:
 			s.vy = -260.0  # letting go early makes a shorter hop
 		if Input.is_action_just_pressed("boost"):
 			r.use_boost()
-	r.step(s, delta, r.pace(dir))
+	if not r.holding():
+		r.step(s, delta, r.pace(dir))
 	if s.grounded:
 		coyote = 0.1
 	else:

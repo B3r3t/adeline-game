@@ -11,6 +11,7 @@ extends Node2D
 ## course ends with one to three stars.
 
 const HorseScript := preload("res://scripts/horse.gd")
+const Scenery := preload("res://scripts/scenery.gd")
 
 const START_X := 8000.0
 const LENGTH := 14000.0
@@ -94,6 +95,8 @@ const RIVALS := [
 	["Daisy", 0.5, Color(1.0, 0.86, 0.5), 2.5, 0.97],
 	["Pepper", 0.9, Color(0.92, 0.92, 1.0), 0.5, 1.03],
 ]
+var countdown := 0.0  # seconds until a race starts: three, two, one, go
+var counted := 0
 var flight := 0.0  # how long the current time in the air has lasted
 var streak := 0  # rings collected in a row
 
@@ -133,7 +136,14 @@ func start(number: int, race := false) -> void:
 	last_x = START_X
 	_build()
 	rider = _rider_at(START_X, 0.0)
+	countdown = 3.4 if racing else 0.0
+	counted = 4
 	active = true
+
+
+## True while the horses wait at the start of a race for the count.
+func holding() -> bool:
+	return countdown > 0.0
 
 
 ## The pace Spirit is asked for. The arrows ask for a slower or faster one.
@@ -335,6 +345,7 @@ func _build() -> void:
 	finish_x = START_X + LENGTH - 300.0
 
 	_build_ground()
+	_add_scenery()
 	_measure_nominal()
 	shadow = Sprite2D.new()
 	shadow.texture = game.spark
@@ -391,6 +402,58 @@ func _build() -> void:
 	if racing:
 		_add_rivals(rng)
 		game.toast("Racing %s, %s and %s!" % [RIDERS[0][1], RIDERS[1][1], RIDERS[2][1]])
+
+
+## Trees, bushes and flowers along the far side of the course, following the hills. They
+## have their own dice, so the course itself is laid out as before.
+func _add_scenery() -> void:
+	var dice := RandomNumberGenerator.new()
+	dice.seed = 800 + course
+	var trees := ["oak", "pine", "apple_tree", "oak", "pine"]
+	var small := ["bush", "blossom", "daisies", "tulips", "lavender", "sunflowers", "boulder", "grass", "mushrooms"]
+	var x := START_X - 700.0
+	while x < START_X + LENGTH + 1500.0:
+		var tall := dice.randf() < 0.45
+		var name: String = trees[dice.randi() % trees.size()] if tall else small[dice.randi() % small.size()]
+		var thing := Scenery.stand(name, Vector2(x, ground_y(x) + 6.0), dice.randf_range(0.85, 1.12))
+		thing.flip_h = dice.randf() < 0.5
+		thing.z_index = -2 if tall else -1
+		if tall:
+			thing.modulate = Color(0.93, 0.96, 1.0)
+		add_child(thing)
+		x += dice.randf_range(240.0, 620.0)
+
+
+## Bits of coloured paper thrown in the air, for the finish.
+func confetti(at: Vector2, amount := 60) -> void:
+	var burst := CPUParticles2D.new()
+	burst.position = at
+	burst.one_shot = true
+	burst.explosiveness = 0.85
+	burst.amount = amount
+	burst.lifetime = 2.2
+	burst.direction = Vector2(0.0, -1.0)
+	burst.spread = 60.0
+	burst.initial_velocity_min = 260.0
+	burst.initial_velocity_max = 640.0
+	burst.gravity = Vector2(0.0, 520.0)
+	burst.damping_min = 60.0
+	burst.damping_max = 120.0
+	burst.angular_velocity_min = -500.0
+	burst.angular_velocity_max = 500.0
+	burst.scale_amount_min = 5.0
+	burst.scale_amount_max = 9.0
+	var colors := Gradient.new()
+	colors.set_color(0, Color(1.0, 0.35, 0.45))
+	colors.set_color(1, Color(0.6, 0.45, 1.0))
+	colors.add_point(0.25, Color(1.0, 0.85, 0.25))
+	colors.add_point(0.5, Color(0.35, 0.85, 0.5))
+	colors.add_point(0.75, Color(0.35, 0.7, 1.0))
+	burst.color_initial_ramp = colors
+	burst.z_index = 4
+	burst.emitting = true
+	add_child(burst)
+	get_tree().create_timer(3.0).timeout.connect(burst.queue_free)
 
 
 ## People who have come to watch the race: a few here and there along the track, and a
@@ -513,11 +576,21 @@ func _add_rivals(rng: RandomNumberGenerator) -> void:
 		for j in jumps.size():
 			if rng.randf() < 0.2 + 0.03 * i:
 				fumbles[j] = true
-		rivals.append({ "node": node, "who": who, "rider": _rider_at(START_X, 0.0), "pace": float(spec[4]), "lane": lane, "want": [90.0, -210.0, -50.0][i], "next": 0, "slow": 0.0, "fumbles": fumbles, "home": false })
+		# They line up a little apart, so all four can be seen waiting for the count.
+		var gate: float = START_X + [110.0, -200.0, -95.0][i]
+		who["position"] = Vector2(gate, ground_y(gate))
+		rivals.append({ "node": node, "who": who, "rider": _rider_at(gate, 0.0), "pace": float(spec[4]), "lane": lane, "want": [90.0, -210.0, -50.0][i], "next": 0, "slow": 0.0, "fumbles": fumbles, "home": false })
 
 
 func _run_rivals(delta: float) -> void:
 	for rival in rivals:
+		if holding():
+			# Waiting for the count: standing in their lanes.
+			var waits: Rider = rival["rider"]
+			rival["who"]["position"] = Vector2(waits.x, waits.y + float(rival["lane"]))
+			rival["who"]["velocity"] = Vector2.ZERO
+			rival["node"].carry(delta)
+			continue
 		var r: Rider = rival["rider"]
 		var target: float = BASE_SPEED * (1.0 + 0.05 * minf(course - 1, 6.0)) * float(rival["pace"])
 		# A horse far in front eases off and one far behind digs in, so the race stays close.
@@ -795,8 +868,19 @@ func _physics_process(delta: float) -> void:
 	if not active:
 		return
 	_place_shadow()
+	if countdown > 0.0:
+		countdown -= delta
+		var n := int(ceil(countdown))
+		if n != counted and n >= 1 and n <= 3:
+			counted = n
+			game.sound.play("pop", -5.0, 0.0, 0.8)
+		if countdown <= 0.0:
+			game.sound.play("chime", -3.0)
+			game.sound.play("crowd_cheer", -9.0, 0.03, 1.0, 0.6)
 	_run_rivals(delta)
 	_crowd_frame(delta)
+	if holding():
+		return
 	boost_time = maxf(boost_time - delta, 0.0)
 	rider.kick = 2.4 if boost_time > 0.0 else 1.0
 	if not finished:
@@ -966,4 +1050,6 @@ func _finish() -> void:
 		place = rivals_home + 1
 		stars = 3 if place == 1 else (2 if place == 2 else 1)
 		game.sound.play("crowd_big", -5.0, 0.0)
+	for side in [-150.0, 150.0]:
+		confetti(Vector2(finish_x + side, ground_y(finish_x) - 60.0))
 	game.on_ride_finished(course, stars)

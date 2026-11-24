@@ -329,6 +329,34 @@ def zap(dice):
     return fade(x, 0.002, 0.05)
 
 
+# Music and background sound, made into loops. For each: the recording (in ../music),
+# how many seconds of lead-in to drop, how long a piece to keep (0 for all of it), how
+# long the join is, and how loud to make it.
+MUSIC = {
+    "home": ("home.mp3", 0.0, 0.0, 3.0, -20), "fight": ("fight.mp3", 0.0, 0.0, 3.0, -20), "ride": ("ride.mp3", 15.0, 0.0, 3.0, -20),
+    "sky": ("sky.mp3", 0.0, 0.0, 3.0, -20), "cozy": ("cozy.mp3", 0.0, 0.0, 3.0, -20),
+}
+AMBIENCE = {"birds": ("birds.mp3", 0.3, 12.5, 2.0, -30), "wind": ("wind.mp3", 0.3, 0.0, 2.5, -30)}
+
+
+def loop(src, folder, name, skip, keep, join, level, channels):
+    """Makes a recording into a loop with no seam: its opening is laid over its ending, so
+    the last instant runs straight into the first."""
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", src, "-af", "loudnorm=I=%d:TP=-2:LRA=9" % level, "-ac", str(channels),
+                          "-ar", str(SR), "-f", "f32le", "-"], capture_output=True, check=True).stdout
+    x = np.frombuffer(raw, dtype=np.float32).reshape(-1, channels).copy()
+    x = x[int(skip * SR): (int((skip + keep) * SR) if keep > 0 else len(x) - int(0.4 * SR))]
+    n = int(join * SR)
+    head, body = x[:n], x[n:]
+    ramp = np.linspace(0.0, 1.0, n)[:, None]
+    body[-n:] = body[-n:] * (1.0 - ramp) + head * ramp
+    wav = os.path.join(folder, name + ".wav")
+    wavfile.write(wav, SR, (np.clip(body, -1, 1) * 32767).astype(np.int16))
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", wav, "-c:a", "libvorbis", "-q:a", "2", os.path.join(folder, name + ".ogg")], check=True)
+    os.remove(wav)
+    return name + ".ogg"
+
+
 def save(folder, name, x, peak=0.7):
     x = x / (np.abs(x).max() + 1e-9) * peak
     wav = os.path.join(folder, name + ".wav")
@@ -507,8 +535,12 @@ def main():
     sounds["wing"] = [save(out, "wing_%d" % v, wing(dice), 0.5) for v in range(3)]
     sounds["zap"] = [save(out, "zap", zap(dice), 0.6)]
 
+    tunes = os.path.join(os.path.dirname(os.path.abspath(raw)), "music")
+    music = {name: loop(os.path.join(tunes, how[0]), out, "music_" + name, how[1], how[2], how[3], how[4], 2) for name, how in MUSIC.items()}
+    ambience = {name: loop(os.path.join(tunes, how[0]), out, "amb_" + name, how[1], how[2], how[3], how[4], 1) for name, how in AMBIENCE.items()}
+
     with open(os.path.join(out, "manifest.json"), "w") as f:
-        json.dump({"sounds": sounds, "lines": lines}, f, indent=1)
+        json.dump({"sounds": sounds, "lines": lines, "music": music, "ambience": ambience}, f, indent=1)
     print("sounds:", {k: len(v) for k, v in sounds.items()})
     print("spoken lines:", len(lines))
 

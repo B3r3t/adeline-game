@@ -571,6 +571,8 @@ func _finish() -> void:
 	if falls == 0 and share >= 0.7:
 		stars = 3
 	game.sister.cheer = 4.0
+	for side in [-170.0, 170.0]:
+		game.ride.confetti(Vector2(finish_x + side, sky_y() + 180.0), 50)
 	game.sound.play("fanfare", -5.0, 0.0)
 	game.sound.shout("adeline", "we_did_it", 1.0, true)
 	_sparkle(at + BODY, 40, Color(1.0, 0.85, 0.4))

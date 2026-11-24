@@ -275,5 +275,16 @@
   "She doesn't want to say goodbye. She wants to come and live with us!": "sl_3.ogg",
   "Mom and Dad? Then I'm coming too!": "sl_4.ogg",
   "My pony is small but she is ever so fast. To the boat!": "sl_5.ogg"
+ },
+ "music": {
+  "home": "music_home.ogg",
+  "fight": "music_fight.ogg",
+  "ride": "music_ride.ogg",
+  "sky": "music_sky.ogg",
+  "cozy": "music_cozy.ogg"
+ },
+ "ambience": {
+  "birds": "amb_birds.ogg",
+  "wind": "amb_wind.ogg"
  }
 }

@@ -14,6 +14,20 @@ var last_time := {}
 var muted := false
 var turn := 0
 
+# Music and background sound. Two music players, so one tune can fade out as the next
+# fades in. `tunes` and `airs` are the loops by name, from the manifest.
+const MUSIC_LEVEL := -7.0  # how loud music is, in decibels, when nobody is talking
+const MUSIC_UNDER_TALK := -15.0
+const AIR_LEVEL := -4.0
+var tunes := {}
+var airs := {}
+var decks: Array = []
+var deck := 0  # which of the two music players is the one playing now
+var tune := ""  # the tune asked for
+var air_player: AudioStreamPlayer = null
+var air := ""
+var music_off := false
+
 
 func _ready() -> void:
 	var text := FileAccess.get_file_as_string("res://audio/manifest.json") if FileAccess.file_exists("res://audio/manifest.json") else ""
@@ -32,12 +46,71 @@ func _ready() -> void:
 			var stream = load("res://audio/" + str(spoken[line]))
 			if stream != null:
 				lines[line] = stream
+		for kind in [["music", tunes], ["ambience", airs]]:
+			var files: Dictionary = data.get(kind[0], {})
+			for name in files:
+				var stream = load("res://audio/" + str(files[name]))
+				if stream != null:
+					stream.loop = true
+					kind[1][name] = stream
 	for i in 10:
 		var p := AudioStreamPlayer.new()
 		add_child(p)
 		players.append(p)
 	voice = AudioStreamPlayer.new()
 	add_child(voice)
+	for i in 2:
+		var p := AudioStreamPlayer.new()
+		p.volume_db = -60.0
+		add_child(p)
+		decks.append(p)
+	air_player = AudioStreamPlayer.new()
+	air_player.volume_db = -60.0
+	add_child(air_player)
+
+
+## Asks for a tune and a background sound by name ("" for none). Changing either is a
+## gentle fade, never a cut. Called every frame with whatever suits the moment.
+func want(music: String, background: String) -> void:
+	if music != tune:
+		tune = music
+		deck = 1 - deck
+		var p: AudioStreamPlayer = decks[deck]
+		p.stop()
+		if tunes.has(music):
+			p.stream = tunes[music]
+			p.volume_db = -50.0
+			p.play()
+	if background != air:
+		air = background
+
+
+func _process(delta: float) -> void:
+	var quiet: bool = muted or music_off
+	# Music dips while somebody is speaking a line, so they can be heard.
+	var level := MUSIC_UNDER_TALK if voice.playing else MUSIC_LEVEL
+	for i in decks.size():
+		var p: AudioStreamPlayer = decks[i]
+		var goal := level if (i == deck and not quiet and tunes.has(tune)) else -60.0
+		p.volume_db = move_toward(p.volume_db, goal, delta * (34.0 if goal > p.volume_db else 46.0))
+		if p.playing and p.volume_db <= -59.0 and i != deck:
+			p.stop()
+		p.stream_paused = quiet and p.volume_db <= -59.0
+	# The background sound: one player, faded down, swapped, and faded up again.
+	var wanted = airs.get(air)
+	if air_player.stream != wanted:
+		air_player.volume_db = move_toward(air_player.volume_db, -60.0, delta * 50.0)
+		if air_player.volume_db <= -59.0:
+			air_player.stop()
+			air_player.stream = wanted
+			if wanted != null:
+				air_player.play()
+	else:
+		air_player.volume_db = move_toward(air_player.volume_db, AIR_LEVEL if (wanted != null and not muted) else -60.0, delta * 30.0)
+
+
+func set_music(on: bool) -> void:
+	music_off = not on
 
 
 func _pick(name: String) -> AudioStream:

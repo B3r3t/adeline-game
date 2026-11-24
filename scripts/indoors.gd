@@ -18,6 +18,7 @@ const PlaymateScript := preload("res://scripts/playmate.gd")
 const KitchenScript := preload("res://scripts/kitchen.gd")
 const Moves := preload("res://scripts/moves.gd")
 const HorseScript := preload("res://scripts/horse.gd")
+const Ui := preload("res://scripts/ui.gd")
 
 const ROOM := Vector2(1344.0, 752.0)
 const SAVE_PATH := "user://home.json"
@@ -620,9 +621,7 @@ func _draw_bathroom(s: Vector2) -> void:
 		overlay.draw_circle(cell.position + Vector2(cell.size.x * 0.76, cell.size.y * 0.3), 8.0, Color(0.7, 0.95, 1.0))
 	# How clean her teeth are.
 	var bar := Rect2(s.x / 2.0 - 150.0, 66.0, 300.0, 18.0)
-	overlay.draw_rect(bar, Color(0.0, 0.0, 0.0, 0.45))
-	overlay.draw_rect(Rect2(bar.position, Vector2(bar.size.x * (1.0 - plaque_left()), bar.size.y)), Color(0.55, 0.9, 1.0))
-	overlay.draw_rect(bar, Color(1.0, 1.0, 1.0, 0.7), false, 2.0)
+	_meter(bar, 1.0 - plaque_left(), Color(0.55, 0.9, 1.0))
 	_text(Vector2(bar.position.x, 110.0), "Clean teeth", 18, Color.WHITE)
 	if clock < 10.0 and not teeth_done:
 		_text(Vector2(0.0, s.y - TRAY - 22.0), "Tap the toothpaste, then scrub the plaque off every tooth.", 22, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
@@ -1407,9 +1406,14 @@ func _text(pos: Vector2, text: String, size: int, color: Color, align: int = HOR
 
 
 func _button(r: Rect2, label: String, size: int, fill: Color) -> void:
-	overlay.draw_rect(r, fill)
-	overlay.draw_rect(r, Color(1.0, 1.0, 1.0, 0.75), false, 2.0)
-	_text(Vector2(r.position.x, r.position.y + r.size.y / 2.0 + size * 0.36), label, size, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
+	Ui.button(overlay, font, r, label, size, fill)
+
+
+## A rounded bar that fills from the left.
+func _meter(bar: Rect2, share: float, color: Color) -> void:
+	Ui.plate(overlay, bar.grow(3.0), Color(0.0, 0.0, 0.0, 0.5))
+	if share > 0.02:
+		Ui.plate(overlay, Rect2(bar.position, Vector2(maxf(bar.size.x * clampf(share, 0.0, 1.0), bar.size.y), bar.size.y)), color)
 
 
 func _fit(tex: Texture2D, r: Rect2) -> void:
@@ -1434,7 +1438,7 @@ func _draw_ui() -> void:
 	for i in _tray_count():
 		var r := _cell_rect(i)
 		var name := _tray_name(i)
-		overlay.draw_rect(r, Color(1.0, 0.95, 0.85, 0.3 if name == tool else 0.13))
+		Ui.plate(overlay, r, Color(1.0, 0.95, 0.85, 0.34 if name == tool else 0.14))
 		_fit(_tex(name), r)
 	_button(_back_rect(), "Back outside", 22, Color(0.08, 0.1, 0.2, 0.6))
 	if place == "house":
@@ -1495,9 +1499,7 @@ func _draw_stable(s: Vector2) -> void:
 		var x := x0 + i * (width + 20.0)
 		_fit(_tex(str(names[i][2])), Rect2(x, 46.0, 44.0, 44.0))
 		var bar := Rect2(x + 50.0, 60.0, width - 50.0, 18.0)
-		overlay.draw_rect(bar, Color(0.0, 0.0, 0.0, 0.45))
-		overlay.draw_rect(Rect2(bar.position, Vector2(bar.size.x * float(care[names[i][1]]), bar.size.y)), Color(1.0, 0.8, 0.25))
-		overlay.draw_rect(bar, Color(1.0, 1.0, 1.0, 0.7), false, 2.0)
+		_meter(bar, float(care[names[i][1]]), Color(1.0, 0.8, 0.25))
 		_text(Vector2(x + 50.0, 104.0), str(names[i][0]), 18, Color.WHITE)
 	if clock < 10.0 and not _all_full() and sleep == 0:
 		_text(Vector2(0.0, 214.0), "Hold food up to %s's mouth. Brush every dusty patch. Stroke her with the heart." % pet, 22, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)

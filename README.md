@@ -52,6 +52,29 @@ point: her little sister is needed three times.
   `_spawn_goblins`): bigger, slower, tougher, and only hurt while dazed.
 - Her sister can follow, stay on a spot or charge to one (`scripts/sister.gd`).
 
+## The look and feel of the whole game
+
+- **Title screen.** A painting of the sisters, Spirit, the pony and the unicorn, the logo,
+  and four cards: Adventure, Riding course, Horse race, Fly the unicorn. The three games
+  each show the course last chosen and the stars won on it; the arrows at the ends of a card
+  step through every course reached so far (one past the last one finished).
+- **Menus.** "Settings" on the title screen and the Menu button everywhere else open the
+  same panel: Sound, Music, Buttons (small, medium, large), Goblin fights (normal or easy),
+  and either "Start a new adventure" (two taps) or "Go to the title screen". Everything
+  stands still while a menu is open. Easy fights give goblins a little over half their
+  health and longer warnings. All four choices are remembered (`user://settings.json`).
+- **One look.** Rounded panels and buttons, hearts and stars are drawn by `scripts/ui.gd` and
+  used on every screen. The typeface is Fredoka (open licence, in `art/ui`).
+- **Speech.** Whoever is talking has their portrait beside the words. The portraits are cut
+  from the characters' own drawings by `art_src/build_faces.py`.
+- **The island.** `scripts/scenery.gd` adds a graded sky, a sun and drifting clouds; trees,
+  bushes, flowers and farmyard things; butterflies round the flowers, birds crossing the
+  sky, rabbits that hop away, a frog on the lily pads; moving water on the river; and a soft
+  shadow under everybody. It is laid out the same way every time and none of it can be
+  bumped into. The riding course and race have trees and flowers along the far side too.
+- **Fights.** The damage of each hit pops out of the goblin as a number.
+- **Races** start with a count of three, with the four horses lined up, and end in confetti.
+
 ## Mission 3: The Missing Unicorn
 
 Merlin offers it once the goblins are dealt with (it does not need Mission 2, but only one of
@@ -259,7 +282,13 @@ Spirit's stable" button.
   a gallop four quick ones and a pause. None play while she is in the air. Other horses (the
   race horses, the pony) are quieter and fade out with distance.
 - Effects for the wand, fireball, shield, rings, knocked rails, rolling bales and landings.
-- "Sound: on / off" sits in the bottom-left corner of the title screen and is remembered.
+- Sound and music are turned on and off in the settings and pause menus, and remembered.
+- **Music.** Five looping tunes: the island and title, goblin fights, riding and racing, the
+  sky, and indoors. One fades into the next, and music dips while someone is speaking.
+  Behind it there is quiet birdsong outdoors and wind in the sky. The tunes were made with a
+  music generator and asked for without singing; the recordings are in `art_src/music` and
+  `art_src/build_audio.py` makes each into a loop with no seam.
+- The little sister's lines in conversation are spoken as well as Merlin's.
 - The voices were recorded with a text-to-speech service (Adeline uses the "Ainsley" voice and Merlin the "Landon" voice, both picked by ear). The effects are made from scratch
   by `art_src/build_audio.py`, which also trims and levels the recordings and writes
   `audio/manifest.json`. `scripts/sound.gd` plays everything; a sound missing from the list is
@@ -340,5 +369,9 @@ How movement stays smooth
 - `scripts/touch_controls.gd` is the on-screen buttons.
 - `scripts/hud.gd` is the hearts, objective, hints and title screen.
 - `scripts/dialog.gd` is the dialogue box and Merlin's mission list.
-- `scripts/horse.gd` is Spirit.
+- `scripts/horse.gd` is Spirit, and the unicorn, the pony and the race horses.
+- `scripts/mission2.gd` and `scripts/mission3.gd` are the two later missions.
+- `scripts/sky.gd` is the sky ride. `scripts/ride.gd` is the riding course and the race.
+- `scripts/scenery.gd` is the sky, trees, flowers and animals. `scripts/ui.gd` is how panels
+  and buttons are drawn. `scripts/sound.gd` plays every sound and the music.
 - `.github/workflows/build-apk.yml` builds the app.

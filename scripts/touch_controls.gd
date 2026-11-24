@@ -27,7 +27,8 @@ func _layout() -> void:
 	var m := EDGE_MARGIN
 	var right := s.x - m
 	var bottom := s.y - m
-	buttons = {
+	var k: float = game.button_scale() if game != null else 1.0
+	buttons = _sized({
 		"left": { "center": Vector2(m + 70.0, bottom - 70.0), "radius": 70.0, "action": "move_left" },
 		"right": { "center": Vector2(m + 70.0 + 156.0, bottom - 70.0), "radius": 70.0, "action": "move_right" },
 		"jump": { "center": Vector2(right - 68.0, bottom - 68.0), "radius": 68.0, "action": "jump" },
@@ -36,8 +37,20 @@ func _layout() -> void:
 		"shield": { "center": Vector2(right - 68.0 - 200.0, bottom - 62.0 - 138.0), "radius": 58.0, "action": "shield" },
 		"interact": { "center": Vector2(m + 70.0 + 78.0, bottom - 70.0 - 150.0), "radius": 60.0, "action": "interact" },
 		"boost": { "center": Vector2(right - 68.0 - 58.0, bottom - 68.0 - 146.0), "radius": 62.0, "action": "boost" },
-	}
+	}, k, Vector2(m, bottom), Vector2(right, bottom))
 	queue_redraw()
+
+
+## The same layout, drawn bigger or smaller. The left-hand buttons grow away from the
+## bottom-left corner and the right-hand ones away from the bottom-right, so none of them
+## moves off the screen or away from the thumb.
+func _sized(layout: Dictionary, k: float, left_corner: Vector2, right_corner: Vector2) -> Dictionary:
+	for id in layout:
+		var b: Dictionary = layout[id]
+		var corner := left_corner if id in ["left", "right", "interact"] else right_corner
+		b["center"] = corner + ((b["center"] as Vector2) - corner) * k
+		b["radius"] = float(b["radius"]) * k
+	return layout
 
 
 func _visible(id: String) -> bool:

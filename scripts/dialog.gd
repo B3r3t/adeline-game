@@ -3,8 +3,13 @@ extends Control
 ## Tap anywhere to move to the next line. In a list, tap a row to choose it,
 ## or tap outside the rows to close.
 
+const Ui := preload("res://scripts/ui.gd")
+# Whose picture goes beside the words, by the name they speak under.
+const FACES := { "Merlin": "merlin", "Little sister": "sister", "Mom": "mom", "Dad": "dad", "Adeline": "adeline" }
+
 var game = null
 var font: Font
+var faces := {}
 var active := false
 var speaker := ""
 var lines: Array = []
@@ -131,30 +136,50 @@ func _tap_list(has_pos: bool, pos: Vector2) -> void:
 		close()
 
 
+func _face(who: String) -> Texture2D:
+	if not FACES.has(who):
+		return null
+	if not faces.has(who):
+		faces[who] = load("res://art/ui/face_%s.png" % FACES[who])
+	return faces[who]
+
+
 func _draw() -> void:
 	if not active:
 		return
 	var p := _panel()
-	draw_rect(p, Color(0.08, 0.1, 0.2, 0.88))
-	draw_rect(p, Color(1.0, 0.9, 0.5, 0.9), false, 3.0)
+	Ui.panel(self, p)
 	if list_mode:
-		draw_string(font, Vector2(p.position.x + 30.0, p.position.y + 50.0), list_title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 30, Color(1.0, 0.9, 0.5))
-		draw_string(font, Vector2(p.position.x, p.position.y + 48.0), "Tap outside to close", HORIZONTAL_ALIGNMENT_RIGHT, p.size.x - 30.0, 16, Color(1.0, 1.0, 1.0, 0.6))
+		draw_string(font, Vector2(p.position.x + 34.0, p.position.y + 52.0), list_title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 30, Color(1.0, 0.9, 0.5))
+		draw_string(font, Vector2(p.position.x, p.position.y + 48.0), "Tap outside to close", HORIZONTAL_ALIGNMENT_RIGHT, p.size.x - 34.0, 16, Color(1.0, 1.0, 1.0, 0.6))
 		for i in rows.size():
 			var row: Dictionary = rows[i]
 			var r := _row_rect(i)
 			var on: bool = row["enabled"]
-			draw_rect(r, Color(0.25, 0.4, 0.75, 0.9) if on else Color(1.0, 1.0, 1.0, 0.08))
-			draw_string(font, Vector2(r.position.x + 20.0, r.position.y + 44.0), str(row["label"]), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 26, Color.WHITE if on else Color(1.0, 1.0, 1.0, 0.55))
-			draw_string(font, Vector2(r.position.x, r.position.y + 44.0), str(row["status"]), HORIZONTAL_ALIGNMENT_RIGHT, r.size.x - 20.0, 22, Color(1.0, 0.9, 0.5) if on else Color(1.0, 1.0, 1.0, 0.5))
+			Ui.button(self, font, r, "", 20, Color(0.25, 0.4, 0.75, 0.95) if on else Color(1.0, 1.0, 1.0, 0.08))
+			draw_string(font, Vector2(r.position.x + 22.0, r.position.y + 44.0), str(row["label"]), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 26, Color.WHITE if on else Color(1.0, 1.0, 1.0, 0.55))
+			draw_string(font, Vector2(r.position.x, r.position.y + 44.0), str(row["status"]), HORIZONTAL_ALIGNMENT_RIGHT, r.size.x - 22.0, 22, Color(1.0, 0.9, 0.5) if on else Color(1.0, 1.0, 1.0, 0.5))
 		return
-	var top := p.position.y + 46.0
-	if speaker != "":
-		draw_string(font, Vector2(p.position.x + 30.0, top), speaker, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 26, Color(1.0, 0.9, 0.5))
+	# Whoever is speaking, with their picture. A line that begins "Dad: " is Dad's, whoever
+	# started the conversation.
+	var who := speaker
+	var words := str(lines[index]) if index < lines.size() else ""
+	for name in FACES:
+		if words.begins_with(name + ": "):
+			who = name
+			words = words.substr(name.length() + 2)
+	var left := p.position.x + 34.0
+	var face := _face(who)
+	if face != null:
+		var bob := sin(opened * 3.0) * 2.0
+		draw_texture_rect(face, Rect2(p.position.x + 24.0, p.position.y + 34.0 + bob, 132.0, 132.0), false)
+		left = p.position.x + 176.0
+	var top := p.position.y + 50.0
+	if who != "":
+		draw_string(font, Vector2(left, top), who, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 27, Color(1.0, 0.9, 0.5))
 		top += 42.0
 	else:
 		top += 10.0
-	if index < lines.size():
-		draw_multiline_string(font, Vector2(p.position.x + 30.0, top), str(lines[index]), HORIZONTAL_ALIGNMENT_LEFT, p.size.x - 60.0, 26, 4, Color.WHITE)
+	draw_multiline_string(font, Vector2(left, top), words, HORIZONTAL_ALIGNMENT_LEFT, p.end.x - 34.0 - left, 26, 4, Color.WHITE)
 	if opened >= 0.3:
-		draw_string(font, Vector2(p.position.x, p.position.y + p.size.y - 20.0), "Tap to continue", HORIZONTAL_ALIGNMENT_RIGHT, p.size.x - 30.0, 18, Color(1.0, 1.0, 1.0, 0.7))
+		draw_string(font, Vector2(p.position.x, p.end.y - 20.0), "Tap to continue", HORIZONTAL_ALIGNMENT_RIGHT, p.size.x - 34.0, 18, Color(1.0, 1.0, 1.0, 0.5 + 0.3 * sin(opened * 5.0)))

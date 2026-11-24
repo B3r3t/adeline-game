@@ -222,6 +222,7 @@ func take_damage(amount: int, from_dir: int) -> void:
 		return
 	health -= amount
 	flash = 0.15
+	game.pop_text(position + Vector2(0.0, -HEIGHT * size - 30.0), str(amount), Color(1.0, 0.9, 0.3) if amount < 3 else Color(1.0, 0.55, 0.15))
 	game.hit_stop(0.045 if health > 0 else 0.09)
 	game.jolt(2.5 if health > 0 else 5.0)
 	game.sound.play("hit", -6.0, 0.12)

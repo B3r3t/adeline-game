@@ -16,6 +16,7 @@ const SisterScript := preload("res://scripts/sister.gd")
 const Mission2Script := preload("res://scripts/mission2.gd")
 const Mission3Script := preload("res://scripts/mission3.gd")
 const SkyScript := preload("res://scripts/sky.gd")
+const SceneryScript := preload("res://scripts/scenery.gd")
 
 const GROUND_Y := 560.0
 const LEVEL_LEFT := 0.0
@@ -81,6 +82,12 @@ var shake := 0.0  # how hard the picture is being shaken, in pixels
 var mission2 = null  # the rescue of Mom and Dad, and the island it happens on
 var mission3 = null  # the missing unicorn
 var sky = null  # the ride above the clouds
+var scenery = null  # the sky, trees, flowers and small animals
+var music_on := true
+var button_size := 1  # the thumb buttons: 0 small, 1 medium, 2 large
+var easy_fights := false  # goblins with less health and slower swings
+var menu := ""  # which menu is open over the game: "", "settings" (title screen) or "pause"
+var fx: Array = []  # numbers and stars that pop out of a hit and drift up: [where, age, text, colour]
 var ride = null  # the riding course
 var sound = null  # voices, grunts and effects
 var sound_on := true
@@ -125,7 +132,14 @@ var clock := 0.0
 
 
 func _ready() -> void:
+	# A rounded, friendly typeface for every word in the game. Anything it lacks falls
+	# back to the engine's own.
+	var face: FontFile = load("res://art/ui/Fredoka-Medium.ttf")
+	if face != null and not (ThemeDB.fallback_font is FontFile and (ThemeDB.fallback_font as FontFile).resource_path == face.resource_path):
+		face.fallbacks = [ThemeDB.fallback_font]
+		ThemeDB.fallback_font = face
 	font = ThemeDB.fallback_font
+	process_mode = Node.PROCESS_MODE_ALWAYS  # so the pause menu still works while all else stands still
 	_setup_input()
 	_build_effects()
 	_build_backdrop()
@@ -136,11 +150,15 @@ func _ready() -> void:
 	mission2.set_script(Mission2Script)
 	mission2.game = self
 	add_child(mission2)
-
 	mission3 = Node2D.new()
 	mission3.set_script(Mission3Script)
 	mission3.game = self
 	add_child(mission3)
+	scenery = Node2D.new()
+	scenery.set_script(SceneryScript)
+	scenery.game = self
+	add_child(scenery)
+	move_child(scenery, mission2.get_index())  # behind everything the adventure puts on the island
 
 	ride = Node2D.new()
 	ride.set_script(RideScript)
@@ -199,6 +217,13 @@ func _ready() -> void:
 	dialog.game = self
 	layer.add_child(dialog)
 
+	# Everything in the world stops when a menu is open. The menu itself, drawn by the
+	# heads-up display, and the sound do not.
+	for child in get_children():
+		if child != layer and child != sound:
+			child.process_mode = Node.PROCESS_MODE_PAUSABLE
+	for child in [indoors, controls, dialog]:
+		child.process_mode = Node.PROCESS_MODE_PAUSABLE
 	_load()
 	_place_player()
 	_check_for_update()
@@ -323,6 +348,7 @@ func set_mount(kind: String) -> void:
 		fresh.bit_at = spec["bit"]
 		fresh.pommel_at = spec["pommel"]
 		fresh.rein_colors = spec["reins"]
+	fresh.process_mode = Node.PROCESS_MODE_PAUSABLE
 	add_child(fresh)
 	if horse != null:
 		fresh.position = horse.position
@@ -382,6 +408,7 @@ func has_save() -> bool:
 
 
 func _load() -> void:
+	_load_settings()
 	data = _default_data()
 	if not has_save():
 		return
@@ -393,13 +420,7 @@ func _load() -> void:
 		for key in data:
 			if parsed.has(key):
 				data[key] = parsed[key]
-	# Whether sound is on is kept apart from the adventure, so a new adventure does not reset it.
-	if FileAccess.file_exists(SETTINGS_PATH):
-		var settings = JSON.parse_string(FileAccess.get_file_as_string(SETTINGS_PATH))
-		if settings is Dictionary:
-			sound_on = bool(settings.get("sound", true))
-	if sound != null:
-		sound.set_muted(not sound_on)
+
 
 
 func _save() -> void:
@@ -408,10 +429,32 @@ func _save() -> void:
 		file.store_string(JSON.stringify(data))
 
 
+## Sound, music, button size and how hard the fights are. These are kept apart from the
+## adventure, so starting a new adventure does not reset them.
+func _load_settings() -> void:
+	if FileAccess.file_exists(SETTINGS_PATH):
+		var settings = JSON.parse_string(FileAccess.get_file_as_string(SETTINGS_PATH))
+		if settings is Dictionary:
+			sound_on = bool(settings.get("sound", true))
+			music_on = bool(settings.get("music", true))
+			button_size = clampi(int(settings.get("buttons", 1)), 0, 2)
+			easy_fights = bool(settings.get("easy", false))
+	if sound != null:
+		sound.set_muted(not sound_on)
+		sound.set_music(music_on)
+	if controls != null:
+		controls._layout()
+
+
 func _save_settings() -> void:
 	var file := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
 	if file != null:
-		file.store_string(JSON.stringify({ "sound": sound_on }))
+		file.store_string(JSON.stringify({ "sound": sound_on, "music": music_on, "buttons": button_size, "easy": easy_fights }))
+
+
+## How much bigger or smaller than usual the thumb buttons are drawn.
+func button_scale() -> float:
+	return [0.84, 1.0, 1.16][button_size]
 
 
 func cleared() -> int:
@@ -610,6 +653,12 @@ func _spawn_goblins() -> void:
 			g.swing_windup = 1.15
 			g.mouth = "ogre"
 			g.cries = { "attack": "ogre_roar", "hurt": "ogre_hurt", "down": "ogre_down" }
+		if easy_fights:
+			# The easy setting: a little over half the health, and longer warnings.
+			g.max_health = int(ceil(g.max_health * 0.6))
+			g.health = g.max_health
+			g.swing_windup *= 1.3
+		g.process_mode = Node.PROCESS_MODE_PAUSABLE
 		g.hold_slot = i
 		g.think = 0.6 + 0.4 * i
 		g.min_x = float(encounter["left"]) + 20.0
@@ -1027,19 +1076,159 @@ func hint() -> String:
 # --- Loop -------------------------------------------------------------------
 
 # Where the on-screen buttons that are not thumb controls sit.
-func adventure_rect() -> Rect2:
+# --- The title screen --------------------------------------------------------------
+# Four cards along the bottom: the adventure, and the three games that can be played on
+# their own. Each of those three remembers which course was last chosen; the arrows at
+# the ends of its card step back and forward through the ones that have been reached.
+
+const GAMES := [
+	{ "id": "adventure", "label": "Adventure", "color": Color(0.25, 0.42, 0.8) },
+	{ "id": "ride", "label": "Riding course", "color": Color(0.26, 0.6, 0.36), "course": "ride_course", "stars": "ride_stars", "word": "Course" },
+	{ "id": "race", "label": "Horse race", "color": Color(0.82, 0.5, 0.14), "course": "race_course", "stars": "race_stars", "word": "Race" },
+	{ "id": "sky", "label": "Fly the unicorn", "color": Color(0.62, 0.36, 0.8), "course": "sky_course", "stars": "sky_stars", "word": "Sky" },
+]
+const CARD_ARROW := 50.0  # how wide the arrow at each end of a card is
+
+
+func card_rect(i: int) -> Rect2:
 	var s := get_viewport_rect().size
-	return Rect2(s.x / 2.0 - 400.0, s.y * 0.56, 380.0, 110.0)
+	var wide := (s.x - 72.0 - 42.0) / 4.0
+	return Rect2(36.0 + i * (wide + 14.0), s.y - 158.0, wide, 124.0)
+
+
+## The furthest course of a game that may be chosen: one past the last one finished.
+func reached(game_id: int) -> int:
+	var best: Dictionary = data[GAMES[game_id]["stars"]]
+	var furthest := 0
+	for key in best:
+		if int(best[key]) > 0:
+			furthest = maxi(furthest, int(key))
+	return furthest + 1
+
+
+func chosen(game_id: int) -> int:
+	return clampi(int(data[GAMES[game_id]["course"]]), 1, reached(game_id))
+
+
+func _tap_card(i: int, pos: Vector2) -> void:
+	var r := card_rect(i)
+	if i == 0:
+		_start(not has_save())
+		return
+	var number := chosen(i)
+	if pos.x < r.position.x + CARD_ARROW or pos.x > r.end.x - CARD_ARROW:
+		var step := -1 if pos.x < r.position.x + CARD_ARROW else 1
+		data[GAMES[i]["course"]] = clampi(number + step, 1, reached(i))
+		_save()
+		sound.play("pop", -8.0, 0.0, 1.2 if step > 0 else 0.9)
+		return
+	match str(GAMES[i]["id"]):
+		"ride":
+			start_ride(number)
+		"race":
+			start_ride(number, true)
+		"sky":
+			start_sky(number)
+
+
+# The old names for the places to tap, kept for the scripted play-throughs.
+func adventure_rect() -> Rect2:
+	return card_rect(0)
 
 
 func ride_rect() -> Rect2:
-	var s := get_viewport_rect().size
-	return Rect2(s.x / 2.0 + 20.0, s.y * 0.56, 380.0, 110.0)
+	return card_rect(1).grow_individual(-CARD_ARROW, 0.0, -CARD_ARROW, 0.0)
 
 
 func race_rect() -> Rect2:
+	return card_rect(2).grow_individual(-CARD_ARROW, 0.0, -CARD_ARROW, 0.0)
+
+
+func settings_rect() -> Rect2:
+	return Rect2(36.0, 30.0, 176.0, 54.0)
+
+
+# --- Menus: settings on the title screen, and the pause menu everywhere else -------------
+
+func open_menu(which: String) -> void:
+	menu = which
+	new_game_armed = false
+	controls.release_all()
+	get_tree().paused = true
+	sound.play("pop", -8.0)
+
+
+func close_menu() -> void:
+	menu = ""
+	new_game_armed = false
+	get_tree().paused = false
+
+
+## The rows of the open menu: what each does, and what it says.
+func menu_rows() -> Array:
+	var rows := []
+	if menu == "pause":
+		rows.append(["resume", "Keep playing"])
+	rows.append(["sound", "Sound: on" if sound_on else "Sound: off"])
+	rows.append(["music", "Music: on" if music_on else "Music: off"])
+	rows.append(["buttons", "Buttons: %s" % ["small", "medium", "large"][button_size]])
+	rows.append(["fights", "Goblin fights: easy" if easy_fights else "Goblin fights: normal"])
+	if menu == "pause":
+		rows.append(["home", "Go to the title screen"])
+	else:
+		if has_save():
+			rows.append(["new", "Tap again to erase everything" if new_game_armed else "Start a new adventure"])
+		rows.append(["resume", "Done"])
+	return rows
+
+
+func menu_panel() -> Rect2:
 	var s := get_viewport_rect().size
-	return Rect2(s.x / 2.0 + 20.0, s.y * 0.56 + 124.0, 380.0, 54.0)
+	var tall := 96.0 + 66.0 * menu_rows().size()
+	return Rect2(s.x / 2.0 - 290.0, maxf((s.y - tall) / 2.0, 8.0), 580.0, tall)
+
+
+func menu_row_rect(i: int) -> Rect2:
+	var p := menu_panel()
+	return Rect2(p.position.x + 40.0, p.position.y + 78.0 + 66.0 * i, p.size.x - 80.0, 54.0)
+
+
+func _tap_menu(pos: Vector2) -> void:
+	var rows := menu_rows()
+	var picked := ""
+	for i in rows.size():
+		if menu_row_rect(i).has_point(pos):
+			picked = str(rows[i][0])
+	if picked == "" and not menu_panel().has_point(pos):
+		picked = "resume"  # a tap outside the menu closes it
+	if picked != "new":
+		new_game_armed = false
+	match picked:
+		"resume":
+			close_menu()
+		"sound":
+			sound_on = not sound_on
+			sound.set_muted(not sound_on)
+			sound.play("chime", -4.0)
+		"music":
+			music_on = not music_on
+			sound.set_music(music_on)
+		"buttons":
+			button_size = (button_size + 1) % 3
+			controls._layout()
+		"fights":
+			easy_fights = not easy_fights
+		"home":
+			close_menu()
+			go_title()
+		"new":
+			if new_game_armed:
+				close_menu()
+				_start(true)
+			else:
+				new_game_armed = true
+	if picked in ["sound", "music", "buttons", "fights"]:
+		_save_settings()
 
 
 ## Where the two buttons sit when a sky ride is over: beside the castle, not over it.
@@ -1059,8 +1248,7 @@ func sky_next_rect() -> Rect2:
 
 
 func sky_rect() -> Rect2:
-	var s := get_viewport_rect().size
-	return Rect2(s.x / 2.0 + 20.0, s.y * 0.56 + 188.0, 380.0, 54.0)
+	return card_rect(3).grow_individual(-CARD_ARROW, 0.0, -CARD_ARROW, 0.0)
 
 
 ## The button that swaps Spirit and the unicorn, under the hearts.
@@ -1070,11 +1258,6 @@ func swap_rect() -> Rect2:
 
 func can_swap() -> bool:
 	return mode == "play" and has_unicorn() and not player.mounted and encounter.is_empty() and not dialog.active and not mission2.on_island and sister.activity == ""
-
-
-func new_game_rect() -> Rect2:
-	var s := get_viewport_rect().size
-	return Rect2(s.x / 2.0 - 400.0, s.y * 0.56 + 124.0, 380.0, 54.0)
 
 
 func enter_rect() -> Rect2:
@@ -1213,29 +1396,25 @@ func _unhandled_input(event: InputEvent) -> void:
 		tapped = true
 	if not tapped:
 		return
+	if menu != "":
+		if has_pos:
+			_tap_menu(pos)
+		elif event is InputEventKey and event.physical_keycode == KEY_ESCAPE:
+			close_menu()
+		return
 	if mode == "title":
 		if clock < 0.5:
 			return
-		if has_pos and sound_rect().has_point(pos):
-			sound_on = not sound_on
-			sound.set_muted(not sound_on)
-			_save_settings()
-			sound.play("chime", -4.0)
-		elif has_pos and ride_rect().has_point(pos):
-			start_ride(int(data["ride_course"]))
-		elif has_pos and race_rect().has_point(pos):
-			start_ride(int(data["race_course"]), true)
-		elif has_pos and sky_rect().has_point(pos):
-			start_sky(int(data["sky_course"]))
-		elif has_save() and has_pos and new_game_rect().has_point(pos):
-			if new_game_armed:
-				_start(true)
-			else:
-				new_game_armed = true
-		elif not has_pos or adventure_rect().has_point(pos):
+		if not has_pos:
 			_start(not has_save())
+		elif settings_rect().has_point(pos):
+			open_menu("settings")
+		else:
+			for i in GAMES.size():
+				if card_rect(i).has_point(pos):
+					_tap_card(i, pos)
 	elif has_pos and menu_rect().has_point(pos):
-		go_title()
+		open_menu("pause")
 	elif mode == "play" and place_action != "" and has_pos and enter_rect().has_point(pos) and not dialog.active:
 		enter_place(place_action)
 	elif has_pos and can_swap() and swap_rect().has_point(pos):
@@ -1263,6 +1442,8 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if get_tree().paused:
+		return
 	_update_camera(delta, false)
 	if mode != "play":
 		context_action = ""
@@ -1328,7 +1509,38 @@ func _update_camera(delta: float, snap: bool) -> void:
 			node.reset_physics_interpolation()
 
 
+## The tune and the background sound for whatever is going on.
+func _set_the_mood() -> void:
+	var tune := "home"
+	var air := "birds"
+	match mode:
+		"play":
+			if not encounter.is_empty():
+				tune = "fight"
+		"ride":
+			tune = "ride"
+		"sky":
+			tune = "sky" if sky.high_up() else "home"
+			air = "wind" if sky.high_up() else "birds"
+		"house", "stable":
+			tune = "cozy"
+			air = ""
+	sound.want(tune, air)
+
+
+## A word or a number that pops out of something and drifts up: the damage of a hit, say.
+func pop_text(at: Vector2, text: String, color: Color) -> void:
+	if fx.size() < 24:
+		fx.append([at + Vector2(randf_range(-10.0, 10.0), 0.0), 0.0, text, color])
+
+
 func _process(delta: float) -> void:
+	_set_the_mood()
+	if get_tree().paused:
+		return
+	for pop in fx:
+		pop[1] = float(pop[1]) + delta
+	fx = fx.filter(func(p): return float(p[1]) < 0.8)
 	clock += delta
 	if not guard_cleared and clock > 3.0:
 		# The game has been running fine for a few seconds, so any update just loaded is good.
@@ -1373,6 +1585,13 @@ func _draw() -> void:
 		var big := float(dust[2])
 		var at: Vector2 = dust[0] + Vector2(float(dust[3]) * 9.0 * age, -3.0 - 11.0 * age * big)
 		draw_circle(at, (4.0 + 13.0 * age) * big, Color(0.95, 0.9, 0.78, 0.5 * (1.0 - age)))
+	for pop in fx:
+		var age := float(pop[1]) / 0.8
+		var at: Vector2 = pop[0] + Vector2(0.0, -50.0 * (1.0 - (1.0 - age) * (1.0 - age)))
+		var ink: Color = pop[3]
+		var size := int(26.0 + 10.0 * sin(minf(age * 5.0, 1.0) * PI))
+		draw_string_outline(font, at + Vector2(-60.0, 0.0), str(pop[2]), HORIZONTAL_ALIGNMENT_CENTER, 120.0, size, 7, Color(0.0, 0.0, 0.0, 0.6 * (1.0 - age * age)))
+		draw_string(font, at + Vector2(-60.0, 0.0), str(pop[2]), HORIZONTAL_ALIGNMENT_CENTER, 120.0, size, Color(ink.r, ink.g, ink.b, 1.0 - age * age))
 
 
 func _draw_merlin_mark(g: float) -> void:
