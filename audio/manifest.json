@@ -68,6 +68,31 @@
   "all_clean": [
    "a_all_clean.ogg"
   ],
+  "hold_on": [
+   "a_hold_on.ogg"
+  ],
+  "falling": [
+   "a_falling.ogg"
+  ],
+  "try_again": [
+   "a_try_again.ogg"
+  ],
+  "free": [
+   "a_free.ogg"
+  ],
+  "fly_up": [
+   "a_fly.ogg",
+   "a_up_we_go.ogg"
+  ],
+  "so_high": [
+   "a_so_high.ogg"
+  ],
+  "call_unicorn": [
+   "a_call_unicorn.ogg"
+  ],
+  "good_girl": [
+   "a_good_girl.ogg"
+  ],
   "sister_hello": [
    "s_hi.ogg"
   ],
@@ -101,6 +126,21 @@
   ],
   "sister_pretty": [
    "s_pretty.ogg"
+  ],
+  "sister_prints": [
+   "s_prints.ogg"
+  ],
+  "sister_unicorn": [
+   "s_unicorn.ogg"
+  ],
+  "sister_flying": [
+   "s_flying.ogg"
+  ],
+  "sister_uhoh": [
+   "s_uhoh.ogg"
+  ],
+  "sister_higher": [
+   "s_higher.ogg"
   ],
   "ogre_roar": [
    "o_roar.ogg"
@@ -199,6 +239,14 @@
   ],
   "squirt": [
    "squirt.ogg"
+  ],
+  "wing": [
+   "wing_0.ogg",
+   "wing_1.ogg",
+   "wing_2.ogg"
+  ],
+  "zap": [
+   "zap.ogg"
   ]
  },
  "lines": {
@@ -215,6 +263,17 @@
   "The ogre has locked your mother and father in his fort on the island across the water.": "merlin_10.ogg",
   "Its gate only opens when two stones are pressed at the very same moment. Nobody can do that alone.": "merlin_11.ogg",
   "Fetch your little sister. Then take the flying boat at the river.": "merlin_12.ogg",
-  "You brought them home! I never doubted the two of you for a moment.": "merlin_13.ogg"
+  "You brought them home! I never doubted the two of you for a moment.": "merlin_13.ogg",
+  "A unicorn fell out of the sky last night. I saw her rainbow streak down over the eastern meadows.": "merlin_14.ogg",
+  "The goblins will want her magic. Find her before they do.": "merlin_15.ogg",
+  "Take your little sister. Only the very young can see a unicorn's hoofprints.": "merlin_16.ogg",
+  "Her hoofprints lead east, past the signpost. Keep your sister close and she will spot them.": "merlin_17.ogg",
+  "A unicorn in our own stable! The sky belongs to the two of you now.": "merlin_18.ogg",
+  "A unicorn? A real one? I'm coming!": "sl_0.ogg",
+  "She says thank you! The goblins scared her and now she can't find her way home.": "sl_1.ogg",
+  "Her home is up in the clouds. Can we take her? Please, please, please?": "sl_2.ogg",
+  "She doesn't want to say goodbye. She wants to come and live with us!": "sl_3.ogg",
+  "Mom and Dad? Then I'm coming too!": "sl_4.ogg",
+  "My pony is small but she is ever so fast. To the boat!": "sl_5.ogg"
  }
 }

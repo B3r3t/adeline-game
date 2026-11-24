@@ -1,0 +1,171 @@
+{
+ "tex_scale": 0.45454545454545453,
+ "parts": [
+  {
+   "name": "body",
+   "parent": "",
+   "z": 5,
+   "pos": [
+    0.0,
+    -69.84
+   ],
+   "pivot": [
+    143.17,
+    176.35
+   ]
+  },
+  {
+   "name": "tail",
+   "parent": "body",
+   "z": 0,
+   "pos": [
+    -59.26,
+    -27.25
+   ],
+   "pivot": [
+    87.3,
+    13.97
+   ]
+  },
+  {
+   "name": "leg_hind_far_upper",
+   "parent": "body",
+   "z": 2,
+   "pos": [
+    -42.33,
+    -1.59
+   ],
+   "pivot": [
+    50.05,
+    17.46
+   ]
+  },
+  {
+   "name": "leg_hind_far_lower",
+   "parent": "leg_hind_far_upper",
+   "z": 1,
+   "pos": [
+    -17.46,
+    31.75
+   ],
+   "pivot": [
+    11.64,
+    87.3
+   ]
+  },
+  {
+   "name": "leg_front_far_upper",
+   "parent": "body",
+   "z": 4,
+   "pos": [
+    20.11,
+    -3.7
+   ],
+   "pivot": [
+    24.44,
+    16.3
+   ]
+  },
+  {
+   "name": "leg_front_far_lower",
+   "parent": "leg_front_far_upper",
+   "z": 3,
+   "pos": [
+    -1.32,
+    33.86
+   ],
+   "pivot": [
+    21.53,
+    90.79
+   ]
+  },
+  {
+   "name": "leg_hind_near_upper",
+   "parent": "body",
+   "z": 7,
+   "pos": [
+    -49.21,
+    0.0
+   ],
+   "pivot": [
+    50.05,
+    17.46
+   ]
+  },
+  {
+   "name": "leg_hind_near_lower",
+   "parent": "leg_hind_near_upper",
+   "z": 6,
+   "pos": [
+    -17.46,
+    31.75
+   ],
+   "pivot": [
+    11.64,
+    87.3
+   ]
+  },
+  {
+   "name": "leg_front_near_upper",
+   "parent": "body",
+   "z": 9,
+   "pos": [
+    14.29,
+    -2.12
+   ],
+   "pivot": [
+    24.44,
+    16.3
+   ]
+  },
+  {
+   "name": "leg_front_near_lower",
+   "parent": "leg_front_near_upper",
+   "z": 8,
+   "pos": [
+    -1.32,
+    33.86
+   ],
+   "pivot": [
+    21.53,
+    90.79
+   ]
+  },
+  {
+   "name": "wing_far",
+   "parent": "body",
+   "z": -1,
+   "pos": [
+    9.0,
+    -33.0
+   ],
+   "pivot": [
+    195.32,
+    263.7
+   ]
+  },
+  {
+   "name": "wing_near",
+   "parent": "body",
+   "z": 10,
+   "pos": [
+    1.0,
+    -29.0
+   ],
+   "pivot": [
+    195.32,
+    263.7
+   ]
+  }
+ ],
+ "wings": {
+  "spread": [
+   195.32,
+   263.7
+  ],
+  "folded": [
+   130.86,
+   24.64
+  ]
+ }
+}

@@ -17,6 +17,7 @@ const RigScript := preload("res://scripts/rig.gd")
 const PlaymateScript := preload("res://scripts/playmate.gd")
 const KitchenScript := preload("res://scripts/kitchen.gd")
 const Moves := preload("res://scripts/moves.gd")
+const HorseScript := preload("res://scripts/horse.gd")
 
 const ROOM := Vector2(1344.0, 752.0)
 const SAVE_PATH := "user://home.json"
@@ -77,7 +78,8 @@ var overlay: Control = null
 var shader: Shader = null
 var textures := {}
 var images := {}
-var home := { "room": [], "bedroom": [], "teeth": { "clean": 0.0, "time": 0.0 }, "care": { "food": 0.0, "shine": 0.0, "love": 0.0, "time": 0.0 } }
+var home := { "room": [], "bedroom": [], "teeth": { "clean": 0.0, "time": 0.0 }, "care": { "food": 0.0, "shine": 0.0, "love": 0.0, "time": 0.0 }, "care2": { "food": 0.0, "shine": 0.0, "love": 0.0, "time": 0.0 } }
+var pet := "Spirit"  # the name of whoever is in the stable: Spirit, or the unicorn
 var clock := 0.0
 var finger := -1
 var note := ""
@@ -156,9 +158,10 @@ func _ready() -> void:
 			for key in ["room", "bedroom"]:
 				if saved.get(key) is Array:
 					home[key] = saved[key]
-			if saved.get("care") is Dictionary:
-				for key in home["care"]:
-					home["care"][key] = float(saved["care"].get(key, 0.0))
+			for which in ["care", "care2"]:
+				if saved.get(which) is Dictionary:
+					for key in home[which]:
+						home[which][key] = float(saved[which].get(key, 0.0))
 			home["balloon"] = int(saved.get("balloon", 0))
 			if saved.get("teeth") is Dictionary:
 				for key in home["teeth"]:
@@ -175,10 +178,16 @@ func _save() -> void:
 		elif room != "":
 			if room == "living" or room == "bedroom":
 				home["room" if room == "living" else "bedroom"] = list
-	home["care"]["time"] = Time.get_unix_time_from_system()
+	if place == "stable":
+		_care()["time"] = Time.get_unix_time_from_system()
 	var file := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
 	if file != null:
 		file.store_string(JSON.stringify(home))
+
+
+## How well looked after the animal in the stable is. Spirit and the unicorn each have their own.
+func _care() -> Dictionary:
+	return home["care2"] if game.mount_kind() == "unicorn" else home["care"]
 
 
 func _tex(name: String) -> Texture2D:
@@ -872,11 +881,18 @@ func _open_stable() -> void:
 	spirit.scale = Vector2(SPIRIT_SIZE, SPIRIT_SIZE)
 	spirit.z_index = int(SPIRIT_AT.y)
 	stage.add_child(spirit)
-	spirit.build("res://art/spirit")
+	# Whichever of the two is Adeline's to ride just now is the one in the stable.
+	var unicorn: bool = game.mount_kind() == "unicorn"
+	var art: String = game.MOUNTS[game.mount_kind()]["art"]
+	pet = str(game.MOUNTS[game.mount_kind()]["title"])
+	spirit.build(art)
+	if unicorn:
+		HorseScript.set_wings(spirit, art, false)
+		spirit.tint("wing_far", Color(0.8, 0.8, 0.9))
 	for part in ["leg_front_far_upper", "leg_front_far_lower", "leg_hind_far_upper", "leg_hind_far_lower"]:
-		spirit.tint(part, Color(0.72, 0.72, 0.78))
+		spirit.tint(part, Color(0.8, 0.8, 0.88) if unicorn else Color(0.72, 0.72, 0.78))
 	# Since the last visit Spirit has got a little hungry, dusty and lonely again.
-	var care: Dictionary = home["care"]
+	var care: Dictionary = _care()
 	var away := maxf(Time.get_unix_time_from_system() - float(care["time"]), 0.0) if float(care["time"]) > 0.0 else 99999.0
 	for key in ["food", "shine", "love"]:
 		care[key] = clampf(float(care[key]) - away / 1200.0, 0.0, 1.0)
@@ -892,7 +908,7 @@ func _open_stable() -> void:
 
 
 func _all_full() -> bool:
-	var care: Dictionary = home["care"]
+	var care: Dictionary = _care()
 	return float(care["food"]) >= 0.999 and float(care["shine"]) >= 0.999 and float(care["love"]) >= 0.999
 
 
@@ -910,7 +926,7 @@ func _spirit_pixel(spot: Vector2) -> Vector2:
 
 ## Is this spot on Spirit: her body, neck and head, or her legs?
 func _touching(spot: Vector2) -> bool:
-	if _solid("spirit_body", spirit.info["body"]["sprite"].texture, _spirit_pixel(spot)):
+	if _solid("body_" + game.mount_kind(), spirit.info["body"]["sprite"].texture, _spirit_pixel(spot)):
 		return true
 	return Rect2(SPIRIT_AT + Vector2(-150.0, -175.0), Vector2(250.0, 175.0)).has_point(spot)
 
@@ -960,7 +976,7 @@ func _use_tool(spot: Vector2) -> void:
 	var moved := spot.distance_to(last_touch) if touching and on_her else 0.0
 	on_her = touching
 	last_touch = spot
-	var care: Dictionary = home["care"]
+	var care: Dictionary = _care()
 	match _tool_kind():
 		"food":
 			if spot.distance_to(_on_spirit(BIT)) < 82.0:
@@ -1000,7 +1016,7 @@ func _use_tool(spot: Vector2) -> void:
 
 
 func _pet(spot: Vector2, amount: float, show := true) -> void:
-	var care: Dictionary = home["care"]
+	var care: Dictionary = _care()
 	var before := float(care["love"])
 	care["love"] = minf(before + amount, 1.0)
 	if show:
@@ -1016,7 +1032,7 @@ func _check_happy() -> void:
 	if _all_full() and not celebrated:
 		celebrated = true
 		hop = 1.7
-		_say("Spirit is happy!")
+		_say("%s is happy!" % pet)
 		game.sound.play("whinny", -3.0)
 		game.sound.play("fanfare", -6.0, 0.0)
 		get_tree().create_timer(0.9).timeout.connect(func(): game.sound.shout("adeline", "happy", 1.0, true))
@@ -1076,7 +1092,9 @@ func _stable_frame(delta: float) -> void:
 	spirit.apply()
 	for patch in dirt:
 		patch["node"].position = _on_spirit(patch["spot"])
-		patch["node"].modulate = Color(0.86, 0.8, 0.66, float(patch["level"]) * 0.75)  # pale dust, to show on a dark coat
+		# Pale dust shows on Spirit's dark coat; on the white unicorn it has to be darker.
+		var dust := Color(0.5, 0.4, 0.28) if game.mount_kind() == "unicorn" else Color(0.86, 0.8, 0.66)
+		patch["node"].modulate = Color(dust.r, dust.g, dust.b, float(patch["level"]) * 0.75)
 	# Things that were let go of fall into the straw, bounce, and fade.
 	var floor_y := SPIRIT_AT.y + 8.0
 	for drop in drops:
@@ -1246,10 +1264,12 @@ func _press(pos: Vector2) -> bool:
 			elif spot.y > BACK - 30.0:
 				_walk_to(spot)  # a tap on the bare floor: Adeline walks there
 	else:
-		if _sleep_rect().has_point(pos) or (sleep > 0 and _touching(spot)):
+		if game.has_unicorn() and _swap_rect().has_point(pos):
+			_swap_stable()
+		elif _sleep_rect().has_point(pos) or (sleep > 0 and _touching(spot)):
 			_toggle_sleep()
 		elif sleep > 0:
-			_say("Shh. Spirit is asleep.")
+			_say("Shh. %s is asleep." % pet)
 		elif cell >= 0:
 			_pick_tool(cell, pos)
 		elif _touching(spot):
@@ -1340,6 +1360,32 @@ func _cell_rect(i: int) -> Rect2:
 func _room_rect() -> Rect2:
 	var s := get_viewport_rect().size
 	return Rect2(s.x - 236.0 if room == "living" else 24.0, 124.0, 212.0, 52.0)
+
+
+## The stable button that brings the other animal in: Spirit, or the unicorn.
+func _swap_rect() -> Rect2:
+	return Rect2(24.0, 124.0, 212.0, 52.0)
+
+
+## The one in the stable goes out to the paddock and the other comes in. Whoever is in the
+## stable is also the one Adeline rides when she goes back outside.
+func _swap_stable() -> void:
+	_drop_tool(false)
+	_care()["time"] = Time.get_unix_time_from_system()
+	sleep = 0
+	spirit.queue_free()
+	for patch in dirt:
+		patch["node"].queue_free()
+	dirt.clear()
+	game.data["mount"] = "spirit" if game.mount_kind() == "unicorn" else "unicorn"
+	game._save()
+	game.set_mount(game.mount_kind())
+	game.horse.place(game.STABLE_X)
+	_open_stable()
+	hop = 0.9
+	_say("Here comes %s!" % pet)
+	game.sound.play("whinny", -4.0, 0.0, 1.3 if game.mount_kind() == "unicorn" else 1.0)
+	game.sound.play("chime", -6.0)
 
 
 func _back_rect() -> Rect2:
@@ -1437,8 +1483,11 @@ func _draw_house(s: Vector2) -> void:
 
 
 func _draw_stable(s: Vector2) -> void:
-	_button(_sleep_rect(), "Wake Spirit" if sleep > 0 else "Bedtime for Spirit", 20, Color(0.3, 0.3, 0.7, 0.9))
-	var care: Dictionary = home["care"]
+	_button(_sleep_rect(), ("Wake %s" if sleep > 0 else "Bedtime for %s") % pet, 20, Color(0.3, 0.3, 0.7, 0.9))
+	if game.has_unicorn():
+		var other := "Spirit" if game.mount_kind() == "unicorn" else str(game.MOUNTS["unicorn"]["title"])
+		_button(_swap_rect(), "Bring in %s" % other, 20, Color(0.55, 0.3, 0.7, 0.9))
+	var care: Dictionary = _care()
 	var names := [["Food", "food", "apple"], ["Shine", "shine", "brush"], ["Love", "love", "heart"]]
 	var width := 210.0
 	var x0 := s.x / 2.0 - (width * 3.0 + 40.0) / 2.0
@@ -1451,4 +1500,4 @@ func _draw_stable(s: Vector2) -> void:
 		overlay.draw_rect(bar, Color(1.0, 1.0, 1.0, 0.7), false, 2.0)
 		_text(Vector2(x + 50.0, 104.0), str(names[i][0]), 18, Color.WHITE)
 	if clock < 10.0 and not _all_full() and sleep == 0:
-		_text(Vector2(0.0, 214.0), "Hold food up to Spirit's mouth. Brush every dusty patch. Stroke her with the heart.", 22, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
+		_text(Vector2(0.0, 214.0), "Hold food up to %s's mouth. Brush every dusty patch. Stroke her with the heart." % pet, 22, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)

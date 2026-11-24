@@ -14,6 +14,8 @@ const SoundScript := preload("res://scripts/sound.gd")
 const IndoorsScript := preload("res://scripts/indoors.gd")
 const SisterScript := preload("res://scripts/sister.gd")
 const Mission2Script := preload("res://scripts/mission2.gd")
+const Mission3Script := preload("res://scripts/mission3.gd")
+const SkyScript := preload("res://scripts/sky.gd")
 
 const GROUND_Y := 560.0
 const LEVEL_LEFT := 0.0
@@ -41,6 +43,16 @@ const GROUND_ART_HEIGHT := 170.0  # how tall the grass-and-soil strip is in the 
 const GRASS_RISE := 24.0  # how far the grass tufts stand above the line characters walk on
 const STRIP_START := -3000.0
 
+# The animals Adeline can ride, and what is particular to each. The unicorn joins the
+# stable at the end of Mission 3. Spots are in pixels of each one's body picture.
+const MOUNTS := {
+	"spirit": { "art": "res://art/spirit", "title": "Spirit" },
+	"unicorn": {
+		"art": "res://art/unicorn", "title": "Aurora", "seat": Vector2(-31.0, -33.0), "bit": Vector2(236.0, 71.0),
+		"pommel": Vector2(128.0, 88.0), "reins": [Color(0.5, 0.16, 0.36), Color(1.0, 0.62, 0.8)],
+	},
+}
+
 # Five goblins in three camps. The first teaches the swing, the second the charge,
 # and the third mixes both with one goblin attacking at a time.
 const ENCOUNTERS := [
@@ -67,6 +79,8 @@ var sister = null  # Adeline's little sister, on her pony
 var puffs: Array = []  # dust kicked up by feet and hooves: [where, age, size, drift]
 var shake := 0.0  # how hard the picture is being shaken, in pixels
 var mission2 = null  # the rescue of Mom and Dad, and the island it happens on
+var mission3 = null  # the missing unicorn
+var sky = null  # the ride above the clouds
 var ride = null  # the riding course
 var sound = null  # voices, grunts and effects
 var sound_on := true
@@ -123,10 +137,20 @@ func _ready() -> void:
 	mission2.game = self
 	add_child(mission2)
 
+	mission3 = Node2D.new()
+	mission3.set_script(Mission3Script)
+	mission3.game = self
+	add_child(mission3)
+
 	ride = Node2D.new()
 	ride.set_script(RideScript)
 	ride.game = self
 	add_child(ride)
+
+	sky = Node2D.new()
+	sky.set_script(SkyScript)
+	sky.game = self
+	add_child(sky)
 
 	sound = Node.new()
 	sound.set_script(SoundScript)
@@ -141,10 +165,7 @@ func _ready() -> void:
 	sister.game = self
 	add_child(sister)
 
-	horse = Node2D.new()
-	horse.set_script(HorseScript)
-	horse.game = self
-	add_child(horse)
+	set_mount("spirit")
 
 	player = CharacterBody2D.new()
 	player.set_script(PlayerScript)
@@ -284,6 +305,59 @@ func _add_scenery(art: String, x: float, centred: bool) -> Sprite2D:
 	return sprite
 
 
+## Puts Spirit or the unicorn outside as the animal Adeline rides. Each is a horse with her
+## own drawings, so changing over means making a fresh one in the old one's place.
+func set_mount(kind: String) -> void:
+	if horse != null and horse.kind == kind:
+		horse.seat_at = MOUNTS[kind].get("seat", HorseScript.SEAT)
+		return
+	var spec: Dictionary = MOUNTS[kind]
+	var fresh = Node2D.new()
+	fresh.set_script(HorseScript)
+	fresh.game = self
+	fresh.kind = kind
+	fresh.art = spec["art"]
+	fresh.title = spec["title"]
+	if spec.has("seat"):
+		fresh.seat_at = spec["seat"]
+		fresh.bit_at = spec["bit"]
+		fresh.pommel_at = spec["pommel"]
+		fresh.rein_colors = spec["reins"]
+	add_child(fresh)
+	if horse != null:
+		fresh.position = horse.position
+		move_child(fresh, horse.get_index())
+		horse.queue_free()
+	horse = fresh
+
+
+func has_unicorn() -> bool:
+	return str(data.get("m3", "")) == "done"
+
+
+## Which animal is Adeline's to ride just now.
+func mount_kind() -> String:
+	return str(data.get("mount", "spirit")) if has_unicorn() else "spirit"
+
+
+## Swaps the animal that is out with the one in the stable. The new one trots over.
+func swap_mount() -> void:
+	if not has_unicorn() or player.mounted:
+		return
+	data["mount"] = "spirit" if mount_kind() == "unicorn" else "unicorn"
+	_save()
+	set_mount(mount_kind())
+	horse.place(STABLE_X)
+	horse.come()
+	toast("%s is coming!" % horse.title)
+	sound.play("whinny", -5.0, 0.0, 1.3 if horse.kind == "unicorn" else 1.0)
+	sound.play("chime", -6.0)
+
+
+func snap_camera() -> void:
+	_update_camera(0.0, true)
+
+
 func _add_wall(rect: Rect2) -> void:
 	var body := StaticBody2D.new()
 	body.collision_layer = 1
@@ -300,7 +374,7 @@ func _add_wall(rect: Rect2) -> void:
 # --- Saved progress ---------------------------------------------------------
 
 func _default_data() -> Dictionary:
-	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "hair": 0, "m2": "available", "m2_step": 0, "m2_thanked": false }
+	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "hair": 0, "m2": "available", "m2_step": 0, "m2_thanked": false, "m3": "available", "m3_step": 0, "m3_clues": 0, "m3_thanked": false, "mount": "spirit", "sky_course": 1, "sky_stars": {} }
 
 
 func has_save() -> bool:
@@ -435,6 +509,8 @@ func _start(new_game: bool) -> void:
 func _place_player() -> void:
 	_clear_goblins()
 	ride.clear()
+	sky.clear()
+	set_mount(mount_kind())
 	sister.reset()
 	zoom = CAMERA_ZOOM
 	camera.zoom = Vector2(zoom, zoom)
@@ -446,6 +522,7 @@ func _place_player() -> void:
 	# Spirit starts in the stable, or close by when continuing from far along the island.
 	horse.place(STABLE_X if cx < 1000.0 else cx - 130.0)
 	mission2.restore()
+	mission3.restore()
 	_update_limits()
 	_update_camera(0.0, true)
 
@@ -466,7 +543,7 @@ func _update_limits() -> void:
 
 
 func input_locked() -> bool:
-	return mode == "title" or mode == "house" or mode == "stable" or dialog.active or defeated or (mode == "ride" and ride.finished) or (mode == "play" and (sister.busy() or mission2.fading()))
+	return mode == "title" or mode == "house" or mode == "stable" or mode == "sky" or dialog.active or defeated or (mode == "ride" and ride.finished) or (mode == "play" and (sister.busy() or mission2.fading()))
 
 
 ## A little cloud of dust on the ground.
@@ -580,11 +657,12 @@ func on_goblin_defeated(_goblin) -> void:
 
 
 func _encounter_cleared() -> void:
+	var kind := encounter_kind
 	if encounter_kind == "mission":
 		data["cleared"] = cleared() + 1
 		data["checkpoint_x"] = player.position.x
 		toast("Goblins defeated! Progress saved.")
-	elif encounter_kind == "m2":
+	elif encounter_kind == "m2" or encounter_kind == "m3":
 		pass  # the mission says what happens next, below
 	else:
 		data["practice_round"] = mini(int(data["practice_round"]) + 1, 3)
@@ -595,6 +673,8 @@ func _encounter_cleared() -> void:
 	player.health = player.MAX_HEALTH
 	if mission2.on_island:
 		mission2.on_fight_won()
+	elif kind == "m3":
+		mission3.on_fight_won()
 	_update_limits()
 	_save()
 	sound.play("fanfare", -5.0, 0.0)
@@ -625,7 +705,7 @@ func _check_triggers() -> void:
 	if player.position.x >= float(enc["trigger"]):
 		if player.mounted:
 			_dismount()
-			toast("Spirit waits back here, safe from the goblins.")
+			toast("%s waits back here, safe from the goblins." % horse.title)
 		horse.retreat(float(enc["left"]) - 90.0)
 		_begin_encounter(enc, "mission")
 
@@ -641,7 +721,9 @@ func _update_context() -> void:
 	if mission2.on_island:
 		context_action = mission2.island_context()
 		return
-	if absf(px - DOOR_X) <= 85.0:
+	if player.position.y < GROUND_Y - 120.0:
+		pass  # flying overhead
+	elif absf(px - DOOR_X) <= 85.0:
 		place_action = "house"
 	elif absf(px - STABLE_X) <= 130.0:
 		place_action = "stable"
@@ -660,11 +742,14 @@ func _update_context() -> void:
 	else:
 		context_action = "call"
 	context_action = mission2.home_context(context_action)
+	context_action = mission3.context(context_action)
 
 
 func merlin_has_news() -> bool:
 	if data["m1"] == "done":
-		return data["m2"] == "available" or (data["m2"] == "done" and not data["m2_thanked"])
+		if data["m2"] == "active" or data["m3"] == "active":
+			return false
+		return data["m2"] == "available" or data["m3"] == "available" or (data["m2"] == "done" and not data["m2_thanked"]) or (data["m3"] == "done" and not data["m3_thanked"])
 	return data["m1"] == "available" or (data["m1"] == "active" and cleared() >= ENCOUNTERS.size())
 
 
@@ -676,8 +761,9 @@ func _interact() -> void:
 		_dismount()
 	elif context_action == "call":
 		horse.come()
-		sound.shout("adeline", "call", 1.0, true)
-		get_tree().create_timer(0.7).timeout.connect(func(): sound.play("whinny", -5.0))
+		sound.shout("adeline", "call_unicorn" if horse.kind == "unicorn" else "call", 1.0, true)
+		var high := 1.3 if horse.kind == "unicorn" else 1.0
+		get_tree().create_timer(0.7).timeout.connect(func(): sound.play("whinny", -5.0, 0.05, high))
 	elif context_action == "talk":
 		_dismount()
 		_talk_to_merlin()
@@ -685,6 +771,8 @@ func _interact() -> void:
 		_talk_to_sister()
 	elif context_action in ["fly", "stay", "come", "open"]:
 		mission2.interact(context_action)
+	elif context_action in ["free", "unicorn"]:
+		mission3.interact(context_action)
 	elif context_action == "boat":
 		_dismount()
 		if data["m2"] == "active":
@@ -705,11 +793,18 @@ func _mount() -> void:
 	horse.set_mounted(true)
 	sound.shout("adeline", "lets_go", 1.0, true)
 	sound.play("snort", -6.0)
+	if sister.want_aboard and horse.wings and sister.activity == "" and absf(sister.x - player.position.x) < 520.0:
+		sister.board(sister.x)
+		horse.seat_at = Vector2(-41.0, -33.0)  # further back, to leave room for her sister in front
+		sound.shout("sister", "sister_whee", 1.0, true)
 
 
 func _dismount() -> void:
 	if not player.mounted:
 		return
+	if sister.mode == "aboard":
+		sister.hop_off()
+		horse.seat_at = MOUNTS[horse.kind].get("seat", HorseScript.SEAT)
 	player.mounted = false
 	horse.set_mounted(false)
 	horse.position = Vector2(player.position.x, GROUND_Y)
@@ -724,7 +819,12 @@ func _talk_to_sister() -> void:
 	]
 	if data["m2"] == "active" and int(data["m2_step"]) == 0:
 		rows.insert(0, { "id": "m2", "label": "Come and help rescue Mom and Dad!", "status": "Mission", "enabled": true })
-	if data["m2"] == "active" and int(data["m2_step"]) >= 1:
+	if data["m3"] == "active" and int(data["m3_step"]) == 0:
+		rows.insert(0, { "id": "m3", "label": "Come and find the unicorn!", "status": "Mission", "enabled": true })
+	var on_mission: bool = (data["m2"] == "active" and int(data["m2_step"]) >= 1) or mission3.with_sister()
+	if horse.wings and not on_mission:
+		rows.append({ "id": "aboard", "label": "Fly on %s with me!" % horse.title, "status": "Play", "enabled": true })
+	if on_mission:
 		pass  # she is on the mission and stays with Adeline
 	elif sister.mode == "follow":
 		rows.append({ "id": "play", "label": "Off you go and play", "status": "", "enabled": true })
@@ -736,10 +836,21 @@ func _talk_to_sister() -> void:
 func _on_sister_picked(id: String) -> void:
 	if id == "m2":
 		mission2.sister_joins()
+	elif id == "m3":
+		mission3.sister_joins()
 	elif id == "race":
 		sister.start_race()
 	elif id == "hair":
 		sister.do_hair()
+	elif id == "aboard":
+		# She will climb up in front whenever Adeline gets on the unicorn.
+		sister.follow()
+		sister.want_aboard = true
+		if absf(player.position.x - horse.position.x) <= RIDE_RANGE + 80.0:
+			_mount()
+		else:
+			horse.come()
+			toast("%s is coming. Hop on and your sister will climb up too!" % horse.title)
 	elif id == "follow":
 		sister.follow()
 		sound.shout("sister", "sister_coming", 1.0, true)
@@ -772,10 +883,19 @@ func _talk_to_merlin() -> void:
 		data["m2_thanked"] = true
 		_save()
 		dialog.say("Merlin", ["You brought them home! I never doubted the two of you for a moment."], _show_missions)
+	elif data["m3"] == "done" and not data["m3_thanked"]:
+		data["m3_thanked"] = true
+		_save()
+		dialog.say("Merlin", ["A unicorn in our own stable! The sky belongs to the two of you now."], _show_missions)
 	elif data["m2"] == "active":
 		dialog.say("Merlin", [
 			"Fetch your little sister. Then take the flying boat at the river.",
 			"Its gate only opens when two stones are pressed at the very same moment. Nobody can do that alone.",
+		])
+	elif data["m3"] == "active":
+		dialog.say("Merlin", [
+			"Her hoofprints lead east, past the signpost. Keep your sister close and she will spot them.",
+			"Take your little sister. Only the very young can see a unicorn's hoofprints.",
 		])
 	else:
 		_show_missions()
@@ -786,7 +906,8 @@ func _show_missions() -> void:
 	var status := { "available": "Available", "active": "Active", "done": "Completed" }
 	var rows := [
 		{ "id": "m1", "label": "Goblin Trouble", "status": status[m1], "enabled": m1 == "available" },
-		{ "id": "m2", "label": "Rescue Mom and Dad", "status": status[str(data["m2"])] if m1 == "done" else "Locked", "enabled": m1 == "done" and data["m2"] == "available" },
+		{ "id": "m2", "label": "Rescue Mom and Dad", "status": status[str(data["m2"])] if m1 == "done" else "Locked", "enabled": m1 == "done" and data["m2"] == "available" and data["m3"] != "active" },
+		{ "id": "m3", "label": "The Missing Unicorn", "status": status[str(data["m3"])] if m1 == "done" else "Locked", "enabled": m1 == "done" and data["m3"] == "available" and data["m2"] != "active" },
 	]
 	if m1 == "done":
 		var n := int(data["practice_round"])
@@ -811,6 +932,17 @@ func _on_mission_picked(id: String) -> void:
 			"The ogre has locked your mother and father in his fort on the island across the water.",
 			"Its gate only opens when two stones are pressed at the very same moment. Nobody can do that alone.",
 			"Fetch your little sister. Then take the flying boat at the river.",
+		])
+	elif id == "m3":
+		data["m3"] = "active"
+		data["m3_step"] = 0
+		data["m3_clues"] = 0
+		_save()
+		mission3.restore()
+		dialog.say("Merlin", [
+			"A unicorn fell out of the sky last night. I saw her rainbow streak down over the eastern meadows.",
+			"The goblins will want her magic. Find her before they do.",
+			"Take your little sister. Only the very young can see a unicorn's hoofprints.",
 		])
 	elif id == "practice":
 		_begin_practice()
@@ -854,9 +986,11 @@ func objective() -> String:
 		return "Find the goblins" if cleared() < ENCOUNTERS.size() else "Return to Merlin"
 	if data["m2"] == "active":
 		return mission2.objective()
-	if data["m2"] == "available":
+	if data["m3"] == "active":
+		return mission3.objective()
+	if data["m2"] == "available" or data["m3"] == "available":
 		return "Talk to Merlin"
-	return "Mission complete"
+	return "All missions complete"
 
 
 func hint() -> String:
@@ -879,9 +1013,15 @@ func hint() -> String:
 		return "The goblins are gone. Call Spirit and ride back west to Merlin."
 	if data["m2"] == "active":
 		return mission2.hint()
+	if data["m3"] == "active":
+		return mission3.hint()
 	if data["m2"] == "available":
 		return "Merlin has a new mission: the rescue of Mom and Dad."
-	return "Your family is home. Race your sister, do her hair, or ride with Spirit."
+	if data["m3"] == "available":
+		return "Merlin has a new mission: a unicorn has gone missing."
+	if player.mounted and horse.wings:
+		return "Tap JUMP in the air and %s beats her wings. Keep tapping to fly!" % horse.title
+	return "Your family is home. Race your sister, do her hair, or go for a ride."
 
 
 # --- Loop -------------------------------------------------------------------
@@ -900,6 +1040,36 @@ func ride_rect() -> Rect2:
 func race_rect() -> Rect2:
 	var s := get_viewport_rect().size
 	return Rect2(s.x / 2.0 + 20.0, s.y * 0.56 + 124.0, 380.0, 54.0)
+
+
+## Where the two buttons sit when a sky ride is over: beside the castle, not over it.
+func sky_panel() -> Rect2:
+	var s := get_viewport_rect().size
+	return Rect2(s.x * 0.46, s.y * 0.2, s.x * 0.5, s.y * 0.6)
+
+
+func sky_again_rect() -> Rect2:
+	var p := sky_panel()
+	return Rect2(p.position.x + 30.0, p.end.y - 106.0, p.size.x / 2.0 - 45.0, 76.0)
+
+
+func sky_next_rect() -> Rect2:
+	var p := sky_panel()
+	return Rect2(p.position.x + p.size.x / 2.0 + 15.0, p.end.y - 106.0, p.size.x / 2.0 - 45.0, 76.0)
+
+
+func sky_rect() -> Rect2:
+	var s := get_viewport_rect().size
+	return Rect2(s.x / 2.0 + 20.0, s.y * 0.56 + 188.0, 380.0, 54.0)
+
+
+## The button that swaps Spirit and the unicorn, under the hearts.
+func swap_rect() -> Rect2:
+	return Rect2(40.0, 84.0, 250.0, 46.0)
+
+
+func can_swap() -> bool:
+	return mode == "play" and has_unicorn() and not player.mounted and encounter.is_empty() and not dialog.active and not mission2.on_island and sister.activity == ""
 
 
 func new_game_rect() -> Rect2:
@@ -977,6 +1147,43 @@ func start_ride(number: int, race := false) -> void:
 	sound.play("whinny", -6.0)
 
 
+# --- The sky ride -----------------------------------------------------------------
+
+## Up into the sky on the unicorn, with her little sister on board. `story` is true for the
+## flight that ends the unicorn mission.
+func start_sky(number: int, story := false) -> void:
+	_place_player()
+	mode = "sky"
+	new_game_armed = false
+	if not story:
+		data["sky_course"] = number
+		_save()
+	set_mount("unicorn")
+	zoom = sky.ZOOM
+	camera.zoom = Vector2(zoom, zoom)
+	sky.start(number, story)
+	player.reset(sky.at)
+	player.min_x = -INF
+	player.max_x = INF
+	horse.place(sky.at.x)
+	player.mounted = true
+	horse.set_mounted(true)
+	horse.seat_at = Vector2(-41.0, -33.0)  # further back, to leave room for her sister in front
+	sister.board(sky.START_X - 420.0)
+	_update_camera(0.0, true)
+	sound.shout("adeline", "hold_on", 1.0, true)
+	sound.play("whinny", -6.0, 0.0, 1.3)
+
+
+func on_sky_finished(number: int, stars: int) -> void:
+	if not sky.story:
+		var best: Dictionary = data["sky_stars"]
+		var key := str(number)
+		if stars > int(best.get(key, 0)):
+			best[key] = stars
+		_save()
+
+
 func on_ride_finished(number: int, stars: int) -> void:
 	var best: Dictionary = data["race_stars" if ride.racing else "ride_stars"]
 	var key := str(number)
@@ -1018,6 +1225,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			start_ride(int(data["ride_course"]))
 		elif has_pos and race_rect().has_point(pos):
 			start_ride(int(data["race_course"]), true)
+		elif has_pos and sky_rect().has_point(pos):
+			start_sky(int(data["sky_course"]))
 		elif has_save() and has_pos and new_game_rect().has_point(pos):
 			if new_game_armed:
 				_start(true)
@@ -1029,6 +1238,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		go_title()
 	elif mode == "play" and place_action != "" and has_pos and enter_rect().has_point(pos) and not dialog.active:
 		enter_place(place_action)
+	elif has_pos and can_swap() and swap_rect().has_point(pos):
+		swap_mount()
+	elif mode == "sky":
+		if sky.state == "done":
+			if sky.state_time < 0.8:
+				pass
+			elif sky.story:
+				mission3.flight_done()
+			elif has_pos and sky_again_rect().has_point(pos):
+				start_sky(sky.course)
+			elif has_pos and sky_next_rect().has_point(pos):
+				start_sky(sky.course + 1)
+		else:
+			sky.tap()
 	elif mode == "ride":
 		if ride.finished and ride.finish_time >= 0.8 and has_pos:
 			if again_rect().has_point(pos):
@@ -1063,6 +1286,8 @@ func _camera_target() -> Vector2:
 	var view := get_viewport_rect().size / zoom
 	# Look a little ahead of Adeline, and keep the ground about three quarters of the way down.
 	var x: float = player.position.x + player.facing * 45.0
+	if mode == "sky":
+		return sky.camera_target(view)
 	if mode == "ride":
 		# On the course Spirit sits toward the left so the next jump is in view early.
 		x = player.position.x + view.x * 0.24
@@ -1073,7 +1298,9 @@ func _camera_target() -> Vector2:
 		x = clampf(x, mission2.LEFT - 190.0 + view.x / 2.0, mission2.RIGHT - view.x / 2.0)
 	else:
 		x = clampf(x, LEVEL_LEFT + view.x / 2.0, LEVEL_RIGHT - view.x / 2.0)
-	return Vector2(x, GROUND_Y - 0.24 * view.y)
+	# When she flies up on the unicorn the camera goes up with her.
+	var rise := maxf(GROUND_Y - 80.0 - player.position.y, 0.0) if (player.mounted and horse.wings) else 0.0
+	return Vector2(x, GROUND_Y - 0.24 * view.y - rise)
 
 
 ## Eases the camera toward Adeline and slides the hills behind it. With snap, it jumps
@@ -1085,7 +1312,12 @@ func _update_camera(delta: float, snap: bool) -> void:
 	else:
 		var ease := 1.0 - exp(-7.0 * delta)
 		cam_pos.x = lerpf(cam_pos.x, target.x, ease)
-		cam_pos.y = lerpf(cam_pos.y, target.y, 1.0 - exp(-4.0 * delta)) if mode == "ride" else target.y
+		if mode == "ride":
+			cam_pos.y = lerpf(cam_pos.y, target.y, 1.0 - exp(-4.0 * delta))
+		elif mode == "sky":
+			cam_pos.y = lerpf(cam_pos.y, target.y, 1.0 - exp(-6.0 * delta))
+		else:
+			cam_pos.y = lerpf(cam_pos.y, target.y, 1.0 - exp(-9.0 * delta))
 	camera.position = cam_pos
 	hills_far.position.x = STRIP_START + cam_pos.x * 0.85
 	hills_near.position.x = STRIP_START + cam_pos.x * 0.6

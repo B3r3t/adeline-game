@@ -308,6 +308,27 @@ def whinny_fallback():
     return fade(x * shape + bandpass(rng.standard_normal(len(n)), 1500, 5000) * shape * 0.12, 0.004, 0.05)
 
 
+def wing(dice):
+    """One beat of a big feathered wing: a soft push of air."""
+    n = int(SR * 0.24)
+    shape = np.hanning(n) ** 0.8
+    shape[: n // 4] *= np.linspace(0.0, 1.0, n // 4) ** 0.5
+    air = signal.sosfilt(signal.butter(2, [260, 1500], btype="band", fs=SR, output="sos"), dice.standard_normal(n)) * shape
+    low = np.sin(2 * np.pi * np.cumsum(np.linspace(120, 70, n)) / SR) * shape * 0.25
+    return fade(air + low, 0.01, 0.05)
+
+
+def zap(dice):
+    """A storm cloud's crackle: a short buzzing snap."""
+    n = int(SR * 0.3)
+    t_ = np.arange(n) / SR
+    buzz = np.sign(np.sin(2 * np.pi * np.cumsum(np.linspace(170, 70, n)) / SR))
+    crackle = signal.sosfilt(signal.butter(2, 1800, btype="high", fs=SR, output="sos"), dice.standard_normal(n)) * (dice.random(n) > 0.55)
+    x = (buzz * 0.5 + crackle * 0.9) * np.exp(-t_ / 0.09)
+    x = signal.sosfilt(signal.butter(2, 5200, btype="low", fs=SR, output="sos"), x)
+    return fade(x, 0.002, 0.05)
+
+
 def save(folder, name, x, peak=0.7):
     x = x / (np.abs(x).max() + 1e-9) * peak
     wav = os.path.join(folder, name + ".wav")
@@ -345,6 +366,21 @@ MERLIN = [
     "Its gate only opens when two stones are pressed at the very same moment. Nobody can do that alone.",
     "Fetch your little sister. Then take the flying boat at the river.",
     "You brought them home! I never doubted the two of you for a moment.",
+    "A unicorn fell out of the sky last night. I saw her rainbow streak down over the eastern meadows.",
+    "The goblins will want her magic. Find her before they do.",
+    "Take your little sister. Only the very young can see a unicorn's hoofprints.",
+    "Her hoofprints lead east, past the signpost. Keep your sister close and she will spot them.",
+    "A unicorn in our own stable! The sky belongs to the two of you now.",
+]
+
+# Things the little sister says in conversation, word for word as the game shows them.
+SISTER_LINES = [
+    "A unicorn? A real one? I'm coming!",
+    "She says thank you! The goblins scared her and now she can't find her way home.",
+    "Her home is up in the clouds. Can we take her? Please, please, please?",
+    "She doesn't want to say goodbye. She wants to come and live with us!",
+    "Mom and Dad? Then I'm coming too!",
+    "My pony is small but she is ever so fast. To the boat!",
 ]
 
 # name in the game -> the recordings (file stems) that can play for it
@@ -370,6 +406,14 @@ ADELINE = {
     "goodnight": ["a_goodnight"],
     "brush_teeth": ["a_brush_teeth"],
     "all_clean": ["a_all_clean"],
+    "hold_on": ["a_hold_on"],
+    "falling": ["a_falling"],
+    "try_again": ["a_try_again"],
+    "free": ["a_free"],
+    "fly_up": ["a_fly", "a_up_we_go"],
+    "so_high": ["a_so_high"],
+    "call_unicorn": ["a_call_unicorn"],
+    "good_girl": ["a_good_girl"],
 }
 SISTER = {
     "sister_hello": ["s_hi"],
@@ -383,6 +427,11 @@ SISTER = {
     "sister_balloon": ["s_balloon"],
     "sister_again": ["s_again"],
     "sister_pretty": ["s_pretty"],
+    "sister_prints": ["s_prints"],
+    "sister_unicorn": ["s_unicorn"],
+    "sister_flying": ["s_flying"],
+    "sister_uhoh": ["s_uhoh"],
+    "sister_higher": ["s_higher"],
 }
 OGRE = {
     "ogre_roar": ["o_roar"],
@@ -412,6 +461,10 @@ def main():
 
     for i, text in enumerate(MERLIN):
         file = recorded("merlin_%d" % i, level=-16.0)
+        if file:
+            lines[text] = file
+    for i, text in enumerate(SISTER_LINES):
+        file = recorded("sl_%d" % i, pitch=1.1, speed=1.0, level=-16.0)
         if file:
             lines[text] = file
     for name, stems in ADELINE.items():
@@ -449,6 +502,10 @@ def main():
     sounds["brush"] = [save(out, "brush", brush(), 0.5)]
     sounds["pop"] = [save(out, "pop", pop(), 0.6)]
     sounds["squirt"] = [save(out, "squirt", squirt(), 0.55)]
+
+    dice = np.random.default_rng(301)  # their own dice, so the effects above come out as before
+    sounds["wing"] = [save(out, "wing_%d" % v, wing(dice), 0.5) for v in range(3)]
+    sounds["zap"] = [save(out, "zap", zap(dice), 0.6)]
 
     with open(os.path.join(out, "manifest.json"), "w") as f:
         json.dump({"sounds": sounds, "lines": lines}, f, indent=1)

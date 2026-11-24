@@ -176,3 +176,22 @@ static func horse_air(pose: Dictionary, fall: float) -> void:
 	pose["tail"] = lerpf(30.0, 40.0, k)
 	pose["neck"] = lerpf(-9.0, 9.0, k)  # head up as she rises, stretched out as she comes down
 	pose["_lift"] = 0.0
+
+
+## A winged horse flying. `fall` is her downward speed: she gathers her front legs and
+## lifts her head as she climbs, and stretches out as she sinks. Her legs paddle the air.
+static func horse_fly(t: float, fall: float) -> Dictionary:
+	var k := smoothstep(-360.0, 360.0, fall)
+	var pose := {}
+	pose["body"] = lerpf(-9.0, 7.0, k)
+	for side in ["near", "far"]:
+		var apart := 0.0 if side == "near" else 6.0
+		var paddle := sin(t * 5.2 + (0.0 if side == "near" else 1.9))
+		pose["leg_front_%s_upper" % side] = lerpf(-58.0, -34.0, k) + apart + paddle * 7.0
+		pose["leg_front_%s_lower" % side] = lerpf(92.0, 44.0, k) - apart + paddle * 9.0
+		pose["leg_hind_%s_upper" % side] = lerpf(40.0, 24.0, k) - apart - paddle * 6.0
+		pose["leg_hind_%s_lower" % side] = lerpf(-6.0, -34.0, k) + paddle * 8.0
+	pose["tail"] = lerpf(34.0, 46.0, k) + sin(t * 6.0) * 4.0
+	pose["neck"] = lerpf(-8.0, 7.0, k)
+	pose["_lift"] = 0.0
+	return pose

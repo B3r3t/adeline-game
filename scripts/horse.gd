@@ -8,7 +8,6 @@ const Moves := preload("res://scripts/moves.gd")
 
 const GALLOP := 620.0
 const SEAT := Vector2(-31.0, -32.0)  # the dip of Spirit's back, measured from the body joint
-const NAME := "Spirit"
 
 var game = null
 var font: Font
@@ -18,7 +17,15 @@ var target_x := 0.0
 var speed := 0.0  # ground speed, drives the leg animation
 var stride := 0.0
 var clock := 0.0
-var art := "res://art/spirit"  # which drawings to wear; the pony has her own
+var art := "res://art/spirit"  # which drawings to wear; the pony and the unicorn have their own
+var kind := "spirit"  # spirit or unicorn
+var title := "Spirit"  # her name, shown over her head
+var rein_colors := [Color(0.13, 0.07, 0.04), Color(0.5, 0.27, 0.13)]  # the edge of the reins, and the leather
+var wings := false  # true for a horse whose drawings include wings
+var flying := false  # in the air on her wings
+var wings_open := true  # which wing pictures are showing: spread, or folded against her sides
+var flap := 9.0  # seconds since her last wingbeat
+static var wing_data := {}  # drawings folder -> the pivots of its wing pictures
 var seat_at := SEAT
 var bit_at := BIT
 var pommel_at := POMMEL
@@ -66,6 +73,11 @@ func _ready() -> void:
 	add_child(rig)
 	rig.bends["body"] = neck
 	rig.build(art)
+	wings = rig.info.has("wing_near")
+	if wings:
+		rig.tint("wing_far", Color(0.8, 0.8, 0.9))
+		wings_open = false
+		set_wings(rig, art, false)
 	# The far legs sit in shadow.
 	for part in ["leg_front_far_upper", "leg_front_far_lower", "leg_hind_far_upper", "leg_hind_far_lower"]:
 		rig.tint(part, Color(0.72, 0.72, 0.78))
@@ -94,7 +106,7 @@ func _ready() -> void:
 		jockey.build(rider_art)
 		for part in ["leg_far_upper", "leg_far_lower"]:
 			jockey.info[part]["sprite"].visible = false  # on the other side of the horse
-	for style in [[5.0, Color(0.13, 0.07, 0.04)], [2.4, Color(0.5, 0.27, 0.13)]]:
+	for style in [[5.0, rein_colors[0]], [2.4, rein_colors[1]]]:
 		var line := Line2D.new()
 		line.width = style[0]
 		line.default_color = style[1]
@@ -105,12 +117,32 @@ func _ready() -> void:
 		reins.append(line)
 
 
+## Shows a winged horse's wings spread for flying, or folded against her sides. Works on any
+## rig built from her drawings: the one outdoors and the one in the stable.
+static func set_wings(on, folder: String, open: bool) -> void:
+	if not wing_data.has(folder):
+		var data = JSON.parse_string(FileAccess.get_file_as_string(folder + "/rig.json"))
+		wing_data[folder] = data.get("wings", {})
+	var pivots: Dictionary = wing_data[folder]
+	var key := "spread" if open else "folded"
+	var tex: Texture2D = load(folder + ("/wing_near.png" if open else "/wing_folded.png"))
+	for part in ["wing_near", "wing_far"]:
+		on.swap(part, tex, Vector2(pivots[key][0], pivots[key][1]), on.info[part]["pos"])
+
+
+## One beat of her wings.
+func beat() -> void:
+	flap = 0.0
+	game.sound.play("wing", -9.0, 0.08, 1.0, 0.1)
+
+
 func place(x: float) -> void:
 	position = Vector2(x, game.GROUND_Y)
 	state = "idle"
 	facing = 1
 	speed = 0.0
 	z_index = 0
+	flying = false
 	reset_physics_interpolation()
 
 
@@ -186,7 +218,7 @@ func carry(delta: float) -> void:
 ## gallop four quick ones and then a pause while she is off the ground. They are soft, and
 ## softer still for any horse that is not Adeline's own, fading out with distance.
 func _hoofbeats(advance: float, on_ground: bool) -> void:
-	if not on_ground or speed < 30.0 or not (game.mode == "play" or game.mode == "ride"):
+	if not on_ground or speed < 30.0 or not (game.mode == "play" or game.mode == "ride" or game.mode == "sky"):
 		return
 	var loud := -17.0 + 4.0 * clampf(speed / 600.0, 0.0, 1.0)
 	if wild:
@@ -227,8 +259,35 @@ func _animate() -> void:
 	# Walk, trot or gallop, by how fast she is going.
 	var pose: Dictionary = Moves.horse_ground(clock, stride, speed)
 	var in_air: bool = state == "mounted" and _who().air
-	if in_air:
+	flap += get_physics_process_delta_time()
+	if wings:
+		# Her wings open the moment she leaves the ground and fold when she lands.
+		var aloft := in_air
+		if aloft != wings_open:
+			wings_open = aloft
+			set_wings(rig, art, aloft)
+		flying = aloft
+	if in_air and flying:
+		pose = Moves.horse_fly(clock, _who().velocity.y)
+	elif in_air:
 		Moves.horse_air(pose, _who().velocity.y)
+	if wings:
+		if wings_open:
+			# A beat is a quick sweep down and a slower lift. Between beats they are held high.
+			var k := flap / 0.5
+			var down := 0.0
+			if k < 0.4:
+				down = sin(k / 0.4 * PI * 0.5)
+			elif k < 1.0:
+				down = 0.5 + 0.5 * cos((k - 0.4) / 0.6 * PI)
+			var hold := sin(clock * 6.5) * 3.0
+			pose["wing_near"] = -6.0 - 104.0 * down + hold
+			pose["wing_far"] = 4.0 - 96.0 * down + hold
+			rig.sharp["wing_near"] = true  # the beat has its own timing
+			rig.sharp["wing_far"] = true
+		else:
+			pose["wing_near"] = -10.0 + sin(clock * 1.3) * 1.2
+			pose["wing_far"] = -8.0 + sin(clock * 1.3 + 0.6) * 1.2
 	# Her legs give as she lands, then push her on.
 	if was_air and not in_air:
 		land_time = 0.0
@@ -311,5 +370,5 @@ func _draw() -> void:
 		return
 	if state != "mounted" and game.mode == "play" and absf(game.player.position.x - position.x) < 260.0:
 		var y := -170.0
-		draw_string_outline(font, Vector2(-60.0, y), NAME, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 20, 5, Color(0.0, 0.0, 0.0, 0.5))
-		draw_string(font, Vector2(-60.0, y), NAME, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 20, Color.WHITE)
+		draw_string_outline(font, Vector2(-60.0, y), title, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 20, 5, Color(0.0, 0.0, 0.0, 0.5))
+		draw_string(font, Vector2(-60.0, y), title, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 20, Color.WHITE)

@@ -310,7 +310,7 @@ func _dress() -> void:
 func _physics_process(delta: float) -> void:
 	clock += delta
 	shrug_note = maxf(shrug_note - delta, 0.0)
-	visible = game.mode != "ride"
+	visible = game.mode != "ride" and game.mode != "sky"
 	# Going dark and coming back, for the boat trips.
 	if fade_way != 0:
 		fade = clampf(fade + fade_way * delta * 2.2, 0.0, 1.0)
@@ -343,7 +343,7 @@ func _physics_process(delta: float) -> void:
 	var sis = game.sister
 	var fighting: bool = not game.encounter.is_empty()
 	if fighting:
-		_sister_fights(delta)
+		sister_fights(delta)
 	elif step() == 2 and p.position.x >= float(GUARDS["trigger"]):
 		_begin(GUARDS)
 	elif step() == 4 and p.position.x >= float(OGRE["trigger"]):
@@ -381,7 +381,7 @@ func _begin(fight: Dictionary) -> void:
 ## Every few seconds she gallops from one end of the fight to the other. Whatever she
 ## passes is bowled over: goblins see stars and lose a little health, and the ogre turns
 ## to watch her go, which is the only time he can be hurt.
-func _sister_fights(delta: float) -> void:
+func sister_fights(delta: float) -> void:
 	var sis = game.sister
 	var fight: Dictionary = game.encounter
 	charge_wait -= delta

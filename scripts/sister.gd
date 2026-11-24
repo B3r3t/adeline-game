@@ -27,7 +27,9 @@ var rest := 1.5  # seconds left of standing still
 var hello := 6.0  # seconds until she may call out again
 var hop := 0.0
 var clock := 0.0
-var mode := "roam"  # roam (her own wandering), follow (Adeline), stay (on a spot) or charge
+var mode := "roam"  # roam (her own wandering), follow (Adeline), stay (on a spot), charge, or aboard (on the unicorn)
+var cheer := 0.0  # seconds left of throwing her arms up, while she rides the unicorn
+var want_aboard := false  # she has been asked to ride the unicorn with Adeline
 var spot := 0.0  # where to stay, or where a charge ends
 var charging := false  # true while a charge is under way
 
@@ -112,6 +114,8 @@ func _physics_process(delta: float) -> void:
 	clock += delta
 	hello = maxf(hello - delta, 0.0)
 	hop = maxf(hop - delta, 0.0)
+	if mode == "aboard":
+		return  # she moves with the unicorn: see ride_along
 	if activity != "":
 		_play(delta)
 		return
@@ -306,7 +310,7 @@ func _play(delta: float) -> void:
 			speed = 0.0
 			var gap := x - pony_x
 			pony_facing = 1 if gap > 0.0 else -1
-			pony_speed = 270.0
+			pony_speed = maxf(270.0, absf(gap) * 1.6)  # from far away it gallops
 			pony_x += pony_facing * pony_speed * delta
 			if absf(gap) < 16.0:
 				on_foot = false
@@ -351,6 +355,66 @@ func _draw() -> void:
 			draw_line(at - Vector2(0.0, r), at + Vector2(0.0, r), Color(1.0, 0.95, 0.6), 2.0)
 
 
+## Climbs up in front of Adeline on the unicorn. Her pony waits at `pony_at`.
+func board(pony_at: float) -> void:
+	mode = "aboard"
+	activity = ""
+	on_foot = false
+	charging = false
+	speed = 0.0
+	pony_x = pony_at
+	pony_speed = 0.0
+	pony.rig.moved = false
+	girl.moved = false
+	girl.z_index = 1
+
+
+## Down off the unicorn. She stands beside it and her pony trots over to fetch her.
+func hop_off() -> void:
+	if mode != "aboard":
+		return
+	girl.z_index = 0
+	girl.rotation = 0.0
+	x = game.horse.position.x - 90.0 * game.horse.facing
+	speed = 0.0
+	girl.moved = false
+	on_foot = true
+	activity = "regroup"
+	follow()
+
+
+## Called each tick while she is on the unicorn, after the unicorn has moved.
+func ride_along(delta: float) -> void:
+	if mode != "aboard":
+		return
+	cheer = maxf(cheer - delta, 0.0)
+	var h = game.horse
+	x = h.position.x
+	facing = h.facing
+	# Her pony stands where it was left.
+	who["position"] = Vector2(pony_x, game.GROUND_Y)
+	who["velocity"] = Vector2.ZERO
+	who["facing"] = 1
+	pony.carry(delta)
+	for part in ["leg_far_upper", "leg_far_lower"]:
+		girl.info[part]["sprite"].visible = false
+	var lean: float = h.rig.root_angle
+	var seat: Vector2 = h.seat() + Vector2(25.0, 2.0).rotated(lean)
+	var rise: float = -h._who().velocity.y if h._who().air else 0.0
+	var pose: Dictionary = Moves.girl_ride(clock, 1.0, clock * 7.0, rise)
+	girl.position = h.position + Vector2(seat.x * facing, seat.y)
+	girl.rotation = lean * facing
+	girl.root_offset = -girl.rest_pos("torso") + Vector2(0.0, float(pose["_lift"]))
+	pose.erase("_lift")
+	if cheer > 0.0:
+		pose["arm_upper"] = -150.0 + sin(clock * 15.0) * 12.0
+		pose["arm_lower"] = -14.0 + sin(clock * 15.0 + 1.0) * 14.0
+	girl.scale = Vector2(facing, 1.0)
+	girl.pose = pose
+	girl.apply()
+	queue_redraw()
+
+
 ## Comes along behind Adeline.
 func follow() -> void:
 	mode = "follow"
@@ -374,6 +438,7 @@ func charge_to(at: float) -> void:
 ## Back to wandering about near home.
 func roam() -> void:
 	mode = "roam"
+	want_aboard = false
 	charging = false
 	rest = 1.0
 	goal = clampf(x, LEFT, RIGHT)
@@ -391,6 +456,10 @@ func reset() -> void:
 	activity = ""
 	on_foot = false
 	hop = 0.0
+	cheer = 0.0
+	want_aboard = false
+	girl.z_index = 0
+	girl.rotation = 0.0
 	set_ribbon(int(game.data.get("ribbon", 0)))
 	set_hair(int(game.data.get("hair", 0)))
 	roam()

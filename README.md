@@ -52,6 +52,60 @@ point: her little sister is needed three times.
   `_spawn_goblins`): bigger, slower, tougher, and only hurt while dazed.
 - Her sister can follow, stay on a spot or charge to one (`scripts/sister.gd`).
 
+## Mission 3: The Missing Unicorn
+
+Merlin offers it once the goblins are dealt with (it does not need Mission 2, but only one of
+the two can be on at a time). A unicorn, Aurora, has fallen out of the sky.
+
+1. Fetch her sister. Only the very young can see a unicorn's hoofprints.
+2. Follow the trail east: three sets of rainbow hoofprints. Each shows itself only when her
+   sister is close, and is found when Adeline walks up to it (or her sister reaches it with
+   Adeline nearby).
+3. Goblin trappers have the unicorn under a net at the east end. The fight works like the
+   guards in Mission 2: her sister charges through and Adeline hits the dizzy goblins.
+4. Tap FREE at the net, then FLY beside the unicorn. Both sisters ride her home through the
+   sky (the sky ride below). Reaching the cloud castle ends the mission.
+5. Aurora comes back to live in the stable.
+
+- `scripts/mission3.gd` holds the mission. Where things are on the island is at the top.
+- Her name is one word in two places: `MOUNTS` in `scripts/main.gd` and `UNICORN_NAME` in
+  `scripts/mission3.gd`.
+
+**Spirit or Aurora.** Once she is home, a "Swap to ..." button sits under the hearts whenever
+Adeline is on foot, and a "Bring in ..." button is in the stable. Whoever is out is the one
+that comes when called, is ridden in the riding course and the race, and is fed and brushed
+in the stable (each has her own food, shine and love).
+
+**Flying on the island.** On Aurora, JUMP in the air is one beat of her wings, so tapping it
+keeps her up and the camera goes up with her. From her little sister's menu, "Fly on Aurora
+with me!" has her climb up in front whenever Adeline mounts.
+
+## The sky ride
+
+"Fly the unicorn" on the title screen, and the last step of Mission 3. It is a third way to
+play, next to the riding course and the race, and works the way Flappy Bird does.
+
+- Any tap is one beat of her wings and lifts her; between taps she sinks. She flies forward
+  by herself.
+- Storm clouds stand in pairs with a gap to fly through, and grumpy thunderclouds sit in the
+  way. Rainbow rings and stars are there to collect; the stars show the easy line.
+- She has three feathers. A bump costs one. With none left, or if she sinks into the cloud
+  sea at the bottom, she tumbles back down to earth and lands in the hay.
+- A tap sends her galloping off and up again. Rainbow arches split each sky into three
+  stretches: she comes back up at the last arch she flew through, with her feathers back.
+- The ride ends at the cloud castle with one to three stars (three: no tumbles and most of
+  the stars). Each sky number is always the same sky; later ones are faster with narrower gaps.
+- Just after arriving in the sky she is held level for a couple of seconds, or until the
+  first tap, so there is time to get ready.
+
+All the numbers are at the top of `scripts/sky.gd`: `GRAVITY`, `FLAP` (how hard one beat
+lifts), `SPEED`, `FEATHERS`, and in `_build` the gap between storm clouds (`gap`, 340 in the
+first sky) and how far apart things are.
+
+Tested with scripted pilots: one that flies the line finishes with three stars; one that never
+taps sinks, lands, and is sent up again; one that flies into every gate loses a feather each
+time and tumbles on the third; and after a tumble past an arch she comes back at the arch.
+
 ## Ride with Spirit
 
 A second way to play, chosen on the title screen. Spirit gallops a course on her own and the

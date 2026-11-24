@@ -36,6 +36,12 @@ const HURT_INVULN := 0.9
 const RIDE_SPEED := 560.0
 const RIDE_JUMP := -820.0
 
+# Flying on the unicorn: each press of JUMP in the air is one beat of her wings.
+const WING_BEAT := -430.0
+const WING_GRAVITY := 1150.0
+const WING_FALL := 440.0  # she never drops faster than this: her wings are spread
+const WING_ROOF := 760.0  # how high above the ground she can go
+
 # What take_hit reports back to an attacker.
 const MISSED := 0
 const HURT := 1
@@ -57,6 +63,7 @@ var coyote := 0.0
 var jump_buffer := 0.0
 var anim_time := 0.0
 var mounted := false
+var winging := false  # true once she has beaten the unicorn's wings, until they land
 var cast_time := 9.0  # seconds since the last fireball, for the casting pose
 var walk_phase := 0.0
 var air := false  # off the ground, on foot or on Spirit
@@ -151,12 +158,19 @@ func _physics_process(delta: float) -> void:
 	if game.mode == "ride" and game.ride.active:
 		_ride(delta)
 		return
+	if game.mode == "sky" and game.sky.active:
+		_sky(delta)
+		return
 	if hit_area.monitoring:
 		hit_area.monitoring = false
 	pitch = 0.0
 
+	var winged: bool = mounted and game.horse.wings
 	if not is_on_floor():
-		velocity.y += GRAVITY * delta
+		if winged:
+			velocity.y = minf(velocity.y + WING_GRAVITY * delta, WING_FALL)
+		else:
+			velocity.y += GRAVITY * delta
 		coyote = maxf(coyote - delta, 0.0)
 	else:
 		coyote = 0.1
@@ -184,9 +198,32 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	velocity.x = walk
 	position.x = clampf(position.x, min_x, max_x)
+	if winged and position.y < game.GROUND_Y - WING_ROOF:
+		position.y = game.GROUND_Y - WING_ROOF
+		velocity.y = maxf(velocity.y, 0.0)
 	air = not is_on_floor()
 	if mounted:
 		game.horse.carry(delta)
+		if game.sister.mode == "aboard":
+			game.sister.ride_along(delta)
+	_animate()
+	queue_redraw()
+
+
+## The sky ride. The sky works out where the unicorn is; Adeline sits on her.
+func _sky(delta: float) -> void:
+	var s = game.sky
+	s.fly(delta)
+	if hit_area.monitoring:
+		hit_area.monitoring = false
+	position = s.at
+	velocity = s.vel
+	air = s.in_air
+	pitch = s.tilt
+	facing = 1
+	mounted = true
+	game.horse.carry(delta)
+	game.sister.ride_along(delta)
 	_animate()
 	queue_redraw()
 
@@ -249,7 +286,15 @@ func _read_actions(delta: float) -> void:
 		game.sound.shout("adeline", "hup", 0.45)
 		jump_buffer = 0.0
 		coyote = 0.0
-	if Input.is_action_just_released("jump") and velocity.y < -260.0:
+	elif Input.is_action_just_pressed("jump") and mounted and game.horse.wings and not is_on_floor():
+		# In the air on the unicorn: one beat of her wings.
+		velocity.y = WING_BEAT
+		winging = true
+		jump_buffer = 0.0
+		game.horse.beat()
+	if is_on_floor():
+		winging = false
+	if Input.is_action_just_released("jump") and velocity.y < -260.0 and not winging:
 		velocity.y = -260.0  # letting go early makes a shorter hop
 	if Input.is_action_just_pressed("fireball") and fireball_cd <= 0.0 and game.mode == "play":
 		_cast_fireball()
@@ -370,6 +415,10 @@ func _animate() -> void:
 		pose = Moves.girl_ride(t, pace, game.horse.stride, -velocity.y if air else 0.0)
 		rig.root_angle = game.horse.rig.root_angle
 		offset = game.horse.seat() - rig.rest_pos("torso")
+		if game.mode == "sky" and game.sky.state == "fall":
+			# Tumbling out of the sky: an arm in the air.
+			pose["arm_upper"] = -120.0 + sin(t * 17.0) * 16.0
+			pose["arm_lower"] = -24.0 + sin(t * 17.0 + 1.0) * 18.0
 	elif air:
 		pose = Moves.girl_air(velocity.y)
 	elif absf(velocity.x) > 20.0:

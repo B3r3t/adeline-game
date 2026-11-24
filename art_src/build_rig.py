@@ -112,6 +112,25 @@ OGRE = {
 }
 
 
+# The unicorn: drawn on Spirit's pattern of sheet, so she is put together the same way.
+# Her wings are separate pictures, added by build_wings.py.
+UNICORN = {
+    "name": "unicorn", "sheet": "unicorn_a", "height": 150.0, "measure": ["leg_front_near_lower", "body"],
+    "parts": [
+        ("body", 0, 1.0, (246, 303), None, None, 5),
+        ("tail", 5, 1.0, (150, 24), "body", (22, 200), 0),
+        ("leg_hind_far_upper", 4, 1.0, (86, 30), "body", (86, 297), 2, above(162)),
+        ("leg_hind_far_lower", 4, 1.0, (20, 150), "leg_hind_far_upper", (20, 150), 1, below(138)),
+        ("leg_front_far_upper", 2, 1.0, (42, 28), "body", (322, 289), 4, above(168)),
+        ("leg_front_far_lower", 2, 1.0, (37, 156), "leg_front_far_upper", (37, 156), 3, below(144)),
+        ("leg_hind_near_upper", 3, 1.0, (86, 30), "body", (60, 303), 7, above(162)),
+        ("leg_hind_near_lower", 3, 1.0, (20, 150), "leg_hind_near_upper", (20, 150), 6, below(138)),
+        ("leg_front_near_upper", 1, 1.0, (42, 28), "body", (300, 295), 9, above(168)),
+        ("leg_front_near_lower", 1, 1.0, (37, 156), "leg_front_near_upper", (37, 156), 8, below(144)),
+    ],
+}
+
+
 def rider(name, height, torso, legs, cloak, shoulder, elbow, arm_at, split, hood_at, head, head_at, tail):
     """One of the riders in a race. They are drawn on Adeline's pattern of sheet, so they are
     put together the same way, each with their own joints."""
@@ -243,7 +262,7 @@ def export(spec, parts_dir, out_dir):
 if __name__ == "__main__":
     parts_dir, out_root = sys.argv[1], sys.argv[2]
     preview = sys.argv[3] if len(sys.argv) > 3 else None
-    for spec in [ADELINE, SPIRIT, GOBLIN, SISTER, PONY, OGRE] + RIDERS:
+    for spec in [ADELINE, SPIRIT, GOBLIN, SISTER, PONY, OGRE, UNICORN] + RIDERS:
         export(spec, parts_dir, os.path.join(out_root, spec["name"]))
     if preview:
         render(ADELINE, parts_dir, [
@@ -278,6 +297,13 @@ if __name__ == "__main__":
             {"leg_front_near_upper": -54, "leg_front_near_lower": 88, "leg_front_far_upper": -49, "leg_front_far_lower": 83,
              "leg_hind_near_upper": 36, "leg_hind_near_lower": 10, "leg_hind_far_upper": 31, "leg_hind_far_lower": 10, "tail": 30, "body": -10},
         ], os.path.join(preview, "pony_poses.png"), px_per_world=4.0, cell=(640, 520))
+        render(UNICORN, parts_dir, [
+            {},
+            {"leg_front_near_upper": -36, "leg_front_near_lower": 10, "leg_front_far_upper": -10, "leg_front_far_lower": 70,
+             "leg_hind_near_upper": 30, "leg_hind_near_lower": 10, "leg_hind_far_upper": -24, "leg_hind_far_lower": -30, "tail": 20},
+            {"leg_front_near_upper": -54, "leg_front_near_lower": 88, "leg_front_far_upper": -49, "leg_front_far_lower": 83,
+             "leg_hind_near_upper": 36, "leg_hind_near_lower": 10, "leg_hind_far_upper": 31, "leg_hind_far_lower": 10, "tail": 30, "body": -10},
+        ], os.path.join(preview, "unicorn_poses.png"), px_per_world=2.6, cell=(640, 520))
         render(OGRE, parts_dir, [
             {},
             {"leg_near": 28, "leg_far": -28},

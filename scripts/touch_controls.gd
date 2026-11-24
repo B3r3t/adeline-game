@@ -145,7 +145,7 @@ func _draw() -> void:
 				_triangle(c, 1.0, r * 0.42)
 			"jump":
 				draw_colored_polygon(PackedVector2Array([c + Vector2(0.0, -r * 0.45), c + Vector2(r * 0.42, r * 0.1), c + Vector2(-r * 0.42, r * 0.1)]), Color(1.0, 1.0, 1.0, 0.9))
-				_label(c + Vector2(0.0, r * 0.55), "JUMP")
+				_label(c + Vector2(0.0, r * 0.55), "FLAP" if game.player.mounted and game.horse.wings and game.player.air else "JUMP")
 			"strike":
 				draw_line(c + Vector2(-r * 0.3, r * 0.15), c + Vector2(r * 0.28, -r * 0.42), Color(0.55, 0.36, 0.2), 8.0)
 				draw_circle(c + Vector2(r * 0.28, -r * 0.42), 9.0, Color(1.0, 0.9, 0.4))
@@ -168,7 +168,7 @@ func _draw() -> void:
 				_label(c + Vector2(0.0, r * 0.62), "SHIELD")
 				_cooldown(c, r, game.player.shield_cd / game.player.SHIELD_COOLDOWN, Color(0.6, 0.85, 1.0))
 			"interact":
-				var words := { "talk": "TALK", "sister": "SISTER", "stay": "STAY", "come": "COME", "fly": "FLY", "open": "OPEN", "boat": "LOOK", "ride": "RIDE", "dismount": "HOP OFF", "call": "CALL" }
+				var words := { "talk": "TALK", "sister": "SISTER", "stay": "STAY", "come": "COME", "fly": "FLY", "open": "OPEN", "free": "FREE", "unicorn": "FLY", "boat": "LOOK", "ride": "RIDE", "dismount": "HOP OFF", "call": "CALL" }
 				var word: String = words.get(game.context_action, "")
 				draw_string(font, Vector2(c.x - 60.0, c.y + 8.0), word, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 24 if word.length() <= 4 else 19, Color(1.0, 1.0, 1.0, 0.98))
 
