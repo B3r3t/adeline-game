@@ -5,6 +5,7 @@ extends Node2D
 
 const RigScript := preload("res://scripts/rig.gd")
 const Moves := preload("res://scripts/moves.gd")
+const Ui := preload("res://scripts/ui.gd")
 
 const GALLOP := 620.0
 const SEAT := Vector2(-31.0, -32.0)  # the dip of Spirit's back, measured from the body joint
@@ -24,6 +25,7 @@ var rein_colors := [Color(0.13, 0.07, 0.04), Color(0.5, 0.27, 0.13)]  # the edge
 var wings := false  # true for a horse whose drawings include wings
 var flying := false  # in the air on her wings
 var wings_open := true  # which wing pictures are showing: spread, or folded against her sides
+var unfold := 1.0  # seconds since her wings last opened or folded, for the way they sweep out
 var flap := 9.0  # seconds since her last wingbeat
 static var wing_data := {}  # drawings folder -> the pivots of its wing pictures
 var seat_at := SEAT
@@ -266,7 +268,14 @@ func _animate() -> void:
 		if aloft != wings_open:
 			wings_open = aloft
 			set_wings(rig, art, aloft)
+			unfold = 0.0
 		flying = aloft
+		# They sweep out from her shoulders as they open, and tuck in as they fold, instead
+		# of changing in a blink.
+		unfold += get_physics_process_delta_time()
+		var grown := Ui.pop(unfold / 0.24) if wings_open else lerpf(1.25, 1.0, Ui.ease(unfold / 0.2))
+		for part in ["wing_near", "wing_far"]:
+			rig.info[part]["sprite"].scale = Vector2(maxf(grown, 0.35), lerpf(0.55, 1.0, minf(grown, 1.0))) * rig.tex_scale
 	if in_air and flying:
 		pose = Moves.horse_fly(clock, _who().velocity.y)
 	elif in_air:

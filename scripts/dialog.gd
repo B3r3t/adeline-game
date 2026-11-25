@@ -20,6 +20,8 @@ var list_title := ""
 var rows: Array = []
 var pick_callback: Callable = Callable()
 var opened := 0.0  # time since opening, so the tap that opened it is not also read as "next"
+var shown := 0.0  # time since the box came up, for the way it pops open
+var spoken := 0.0  # time since this line began, for the way its words arrive
 
 
 func _ready() -> void:
@@ -29,12 +31,16 @@ func _ready() -> void:
 
 
 func say(who: String, what: Array, when_done: Callable = Callable()) -> void:
+	var was := active
 	active = true
 	list_mode = false
 	speaker = who
 	lines = what
 	index = 0
 	done_callback = when_done
+	if not was:
+		shown = 0.0
+	spoken = 0.0
 	opened = 0.0
 	_speak()
 	queue_redraw()
@@ -46,6 +52,7 @@ func choose(title: String, options: Array, when_picked: Callable) -> void:
 	list_title = title
 	rows = options
 	pick_callback = when_picked
+	shown = 0.0
 	opened = 0.0
 	queue_redraw()
 
@@ -67,6 +74,8 @@ func close() -> void:
 func _process(delta: float) -> void:
 	if active:
 		opened += delta
+		shown += delta
+		spoken += delta
 		queue_redraw()
 
 
@@ -111,6 +120,7 @@ func _input(event: InputEvent) -> void:
 func _next_line() -> void:
 	index += 1
 	opened = 0.15
+	spoken = 0.0
 	if index >= lines.size():
 		var callback := done_callback
 		close()
@@ -148,6 +158,9 @@ func _draw() -> void:
 	if not active:
 		return
 	var p := _panel()
+	# The box pops open; after that only what is in it changes.
+	var k := maxf(Ui.pop(shown / 0.26), 0.001)
+	draw_set_transform(p.get_center() * (1.0 - k), 0.0, Vector2(k, k))
 	Ui.panel(self, p)
 	if list_mode:
 		draw_string(font, Vector2(p.position.x + 34.0, p.position.y + 52.0), list_title, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 30, Color(1.0, 0.9, 0.5))
@@ -171,7 +184,8 @@ func _draw() -> void:
 	var left := p.position.x + 34.0
 	var face := _face(who)
 	if face != null:
-		var bob := sin(opened * 3.0) * 2.0
+		# The face nods as each line starts, as if taking a breath to speak.
+		var bob := sin(opened * 3.0) * 2.0 - sin(clampf(spoken / 0.3, 0.0, 1.0) * PI) * 7.0
 		draw_texture_rect(face, Rect2(p.position.x + 24.0, p.position.y + 34.0 + bob, 132.0, 132.0), false)
 		left = p.position.x + 176.0
 	var top := p.position.y + 50.0
@@ -180,6 +194,11 @@ func _draw() -> void:
 		top += 42.0
 	else:
 		top += 10.0
+	# The words arrive quickly, a word at a time, rather than all at once.
+	var upto := int(spoken * 90.0)
+	if upto < words.length():
+		var cut := words.rfind(" ", upto)
+		words = words.substr(0, cut if cut > 0 else 0)
 	draw_multiline_string(font, Vector2(left, top), words, HORIZONTAL_ALIGNMENT_LEFT, p.end.x - 34.0 - left, 26, 4, Color.WHITE)
 	if opened >= 0.3:
 		draw_string(font, Vector2(p.position.x, p.end.y - 20.0), "Tap to continue", HORIZONTAL_ALIGNMENT_RIGHT, p.size.x - 34.0, 18, Color(1.0, 1.0, 1.0, 0.5 + 0.3 * sin(opened * 5.0)))

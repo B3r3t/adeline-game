@@ -51,6 +51,23 @@ static func button(on: CanvasItem, font: Font, r: Rect2, label: String, size: in
 		on.draw_string(font, Vector2(r.position.x, y), label, HORIZONTAL_ALIGNMENT_CENTER, r.size.x, size, ink)
 
 
+## How big something that pops in should be, `t` of the way through: nothing, then a
+## little over full size, then full size.
+static func pop(t: float) -> float:
+	if t <= 0.0:
+		return 0.0
+	if t >= 1.0:
+		return 1.0
+	var u := t - 1.0
+	return 1.0 + 2.4 * u * u * u + 1.4 * u * u
+
+
+## Something that slides into place and slows as it arrives: 0 at the start, 1 at rest.
+static func ease(t: float) -> float:
+	var u := 1.0 - clampf(t, 0.0, 1.0)
+	return 1.0 - u * u * u
+
+
 ## A five-pointed star, lit or not.
 static func star(on: CanvasItem, center: Vector2, radius: float, lit: bool) -> void:
 	var pts := PackedVector2Array()

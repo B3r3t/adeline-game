@@ -644,6 +644,12 @@ func _front() -> float:
 	return minf(_seen().end.y - 8.0, 700.0)
 
 
+## The kitchen is drawn closer up than the other rooms, with the grown-ups in it, so
+## Adeline and her sister are drawn bigger there to stand the right height beside them.
+func kid_size() -> float:
+	return KitchenScript.KID if room == "kitchen" else 1.0
+
+
 ## How big something looks when its foot is this far down the room.
 func _depth(foot: float) -> float:
 	return lerpf(FAR_SIZE, NEAR_SIZE, clampf((foot - BACK) / (NEAR - BACK), 0.0, 1.0))
@@ -1163,7 +1169,7 @@ func _animate_adeline(delta: float) -> void:
 	if place == "house" and sleep == 1 and to.length() <= 5.0:
 		sleep = 2  # she has reached her bed
 		game.sound.shout("adeline", "goodnight", 1.0, true)
-	var size := 2.3 * (_depth(at.y) if place == "house" else 1.0)
+	var size := 2.3 * (_depth(at.y) * kid_size() if place == "house" else 1.0)
 	adeline.root_angle = 0.0
 	if place == "house" and sleep == 2 and _bed() >= 0:
 		# Lying on her bed, head on the pillow, breathing slowly.
@@ -1447,7 +1453,11 @@ func _draw_ui() -> void:
 	else:
 		_draw_stable(s)
 	if note_time > 0.0:
+		# Messages pop up out of the middle of the screen rather than just appearing.
+		var grown := maxf(Ui.pop((2.6 - note_time) / 0.3), 0.001)
+		overlay.draw_set_transform(Vector2(s.x / 2.0, s.y * 0.3 - 14.0) * (1.0 - grown), 0.0, Vector2(grown, grown))
 		_text(Vector2(0.0, s.y * 0.3), note, 44, Color(1.0, 0.92, 0.5, minf(note_time, 1.0)), HORIZONTAL_ALIGNMENT_CENTER, s.x)
+		overlay.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_house(s: Vector2) -> void:

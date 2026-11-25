@@ -206,6 +206,10 @@ func _animals_frame(delta: float) -> void:
 		var t: float = clock * float(b["pace"]) + float(b["phase"])
 		var home: Vector2 = b["home"]
 		var at := home + Vector2(sin(t * 0.7) * 70.0 + sin(t * 1.9) * 18.0, -30.0 + sin(t * 1.1) * 34.0 + sin(t * 3.3) * 8.0)
+		# They flutter up out of the way when Adeline comes by, and drift back down after.
+		var near := clampf(1.0 - absf(at.x - float(game.player.position.x)) / 150.0, 0.0, 1.0)
+		b["shy"] = move_toward(float(b.get("shy", 0.0)), near, delta * (3.0 if near > float(b.get("shy", 0.0)) else 0.8))
+		at.y -= float(b["shy"]) * 150.0
 		node.flip_h = cos(t * 0.7) < 0.0
 		node.position = at
 		var open := sin(t * 16.0) > 0.0

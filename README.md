@@ -74,6 +74,20 @@ point: her little sister is needed three times.
   bumped into. The riding course and race have trees and flowers along the far side too.
 - **Fights.** The damage of each hit pops out of the goblin as a number.
 - **Races** start with a count of three, with the four horses lined up, and end in confetti.
+- **Motion.** Nothing on screen just appears.
+  - Going anywhere new (into the house, through a door, to a race, back to the title) opens
+    the new place out of the dark from the middle of the screen (`scripts/curtain.gd`).
+  - Menus, the speech box, results and "try again" panels pop open. Words in the speech
+    box arrive a word at a time and the speaker's portrait nods as each line starts.
+  - On a results panel the stars arrive one at a time, each with a higher chime.
+  - The title: the name drops in, the four cards come up one after another, the painting
+    drifts slowly and stars twinkle on it.
+  - A new goal swells and lights up; messages slide in; counters (rings, stars, place in a
+    race) jump when they change; hearts shake when one is lost and the lost one floats off.
+  - Thumb buttons squash when pressed and send out a ring.
+  - The unicorn's wings sweep out and tuck in instead of changing in a blink, butterflies
+    flutter up out of Adeline's way, and the mark over Merlin pulses when he has news.
+  The timing helpers (`pop`, `ease`) are in `scripts/ui.gd`.
 
 ## Mission 3: The Missing Unicorn
 
@@ -226,10 +240,31 @@ her ponytail (`art_src/build_hair.py`, `art/sister/hair.json`).
 
 A fourth room, reached from the living room. The family have it as they like it, so
 nothing is placed here. It goes round on the clock (`scripts/kitchen.gd`): a while of
-cooking at the stove while the table is laid, a longer while with everyone sat at the
-table and dinner on it, then a short spell when the kitchen is empty. Grandma is always
-part of it; Mom and Dad join once they have been rescued. While dinner is on the table
-Adeline can sit down and eat with them.
+cooking at the stove while the table is laid, a longer while with everyone sat down to the
+meal, then a short spell when the kitchen is empty. Each time round is a different meal:
+breakfast (pancakes, eggs and bacon, toast, berries, juice, jam), lunch (soup, a loaf,
+salad, cheese, fruit, water) and dinner (roast chicken, mash, peas and carrots, rolls,
+pie, gravy). Grandma is always part of it; Mom and Dad join once they have been rescued.
+
+- **The table** is drawn so its top can be seen, and everything on it is its own picture
+  set down at a place: a plate, cutlery and a drink in front of each chair (mugs for the
+  grown-ups, milk for the girls), serving dishes along the cloth down the middle, the
+  flowers and the salt and pepper always there. Only the people at home get a place.
+- **Laying it.** During the cooking the places go down one at a time, then the dishes
+  come out; each lands with a small bounce. Late in the meal the plates are empty. When
+  the kitchen is quiet the table is cleared.
+- **Sitting down.** Five chairs stand along the far side. The family lean in for a
+  mouthful each in their own rhythm. Adeline's sister comes to the table by herself when
+  the meal is on it (on a cushion, as she is small), and "Sit down and eat" brings Adeline
+  round to her own chair, where she eats with her hand coming up to her mouth.
+- **Sizes.** The kitchen is drawn closer up than the other rooms, so Adeline and her
+  sister are drawn 1.12 times bigger in it (`KID` in `kitchen.gd`), which puts Adeline at
+  about nine tenths of Mom's height, and bigger again sat at the table (`KID_SAT`), where
+  only heads and shoulders show beside the family's.
+
+The table, chairs, tableware and food are cut from generated sheets by
+`art_src/build_kitchen.py` into `art/room/kitchen`, which also reshapes the table (a
+deeper top, shorter legs) and writes the size each thing is drawn at.
 
 ## At home
 
@@ -372,6 +407,7 @@ How movement stays smooth
 - `scripts/horse.gd` is Spirit, and the unicorn, the pony and the race horses.
 - `scripts/mission2.gd` and `scripts/mission3.gd` are the two later missions.
 - `scripts/sky.gd` is the sky ride. `scripts/ride.gd` is the riding course and the race.
+- `scripts/curtain.gd` opens each new place out of the dark.
 - `scripts/scenery.gd` is the sky, trees, flowers and animals. `scripts/ui.gd` is how panels
   and buttons are drawn. `scripts/sound.gd` plays every sound and the music.
 - `.github/workflows/build-apk.yml` builds the app.

@@ -12,6 +12,8 @@ var font: Font
 var buttons := {}  # id -> { center, radius, action }
 var fingers := {}  # finger index -> button id
 var held := {}  # button id -> true while pressed
+var sunk := {}  # button id -> how far it is pressed in, 0 to 1, eased so it squashes and springs back
+var rings := []  # ripples from buttons just pressed: [centre, radius of the button, age]
 
 
 func _ready() -> void:
@@ -135,6 +137,15 @@ func _process(_delta: float) -> void:
 		if not _visible(fingers[index]):
 			fingers.erase(index)
 			_sync()
+	for id in buttons:
+		var was := float(sunk.get(id, 0.0))
+		var now := move_toward(was, 1.0 if held.has(id) else 0.0, _delta * (14.0 if held.has(id) else 7.0))
+		if held.has(id) and was == 0.0 and _visible(id):
+			rings.append([buttons[id]["center"], buttons[id]["radius"], 0.0])
+		sunk[id] = now
+	for ring in rings:
+		ring[2] = float(ring[2]) + _delta
+	rings = rings.filter(func(r): return float(r[2]) < 0.35)
 	queue_redraw()  # keeps the cooldown rings moving
 
 
@@ -146,6 +157,9 @@ func _draw() -> void:
 		var c: Vector2 = b["center"]
 		var r: float = b["radius"]
 		var down: bool = held.has(id)
+		# A pressed button squashes a little and springs back when let go.
+		var squash := 1.0 - 0.1 * float(sunk.get(id, 0.0))
+		draw_set_transform(c * (1.0 - squash), 0.0, Vector2(squash, squash))
 		var fill := Color(1.0, 1.0, 1.0, 0.42 if down else 0.2)
 		if id == "interact":
 			fill = Color(1.0, 0.85, 0.3, 0.6 if down else 0.4)
@@ -184,6 +198,10 @@ func _draw() -> void:
 				var words := { "talk": "TALK", "sister": "SISTER", "stay": "STAY", "come": "COME", "fly": "FLY", "open": "OPEN", "free": "FREE", "unicorn": "FLY", "boat": "LOOK", "ride": "RIDE", "dismount": "HOP OFF", "call": "CALL" }
 				var word: String = words.get(game.context_action, "")
 				draw_string(font, Vector2(c.x - 60.0, c.y + 8.0), word, HORIZONTAL_ALIGNMENT_CENTER, 120.0, 24 if word.length() <= 4 else 19, Color(1.0, 1.0, 1.0, 0.98))
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	for ring in rings:
+		var k := float(ring[2]) / 0.35
+		draw_arc(ring[0], float(ring[1]) * (1.0 + 0.35 * k), 0.0, TAU, 48, Color(1.0, 1.0, 1.0, 0.6 * (1.0 - k)), 4.0 * (1.0 - k) + 1.0)
 
 
 ## Darkens a button and draws a ring that fills as the spell becomes ready again.

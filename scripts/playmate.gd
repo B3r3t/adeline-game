@@ -27,6 +27,7 @@ var facing := 1
 var walk := 0.0
 var hop := 0.0
 var idle := 0.0  # seconds until she next does something of her own
+var hold := false  # the kitchen has her at the table: she stays put
 var clock := 0.0
 
 var play := ""  # "", "balloon", "over" (the balloon has landed) or "hair"
@@ -213,7 +214,7 @@ func draw_ui(s: Vector2) -> void:
 		inn._button(_done(), "Done", 22, Color(0.3, 0.6, 0.35, 0.92))
 		if styling >= 0 and rig != null:
 			# Sparkles round her head while her hair is brushed.
-			var head: Vector2 = inn._to_screen(at + Vector2(-facing * 20.0, -150.0 * inn._depth(at.y)))
+			var head: Vector2 = inn._to_screen(at + Vector2(-facing * 20.0, -150.0 * inn._depth(at.y) * inn.kid_size()))
 			for i in 7:
 				var a := clock * 3.2 + i * TAU / 7.0
 				var p := head + Vector2(cos(a) * 60.0, sin(a * 1.3) * 42.0)
@@ -356,7 +357,7 @@ func frame(delta: float) -> void:
 			game.sound.play("brush", -5.0, 0.1)
 		if style_time <= 0.0:
 			_finish_style()
-	elif play == "":
+	elif play == "" and not hold:
 		# Left to herself she keeps near Adeline, and now and then waves or wanders.
 		if at.distance_to(inn.at) > 200.0:
 			goal = _on_floor(inn.at + Vector2(-inn.facing * 95.0, 8.0))
@@ -368,7 +369,7 @@ func frame(delta: float) -> void:
 			else:
 				goal = _on_floor(inn.at + Vector2(randf_range(-190.0, 190.0), randf_range(-30.0, 20.0)))
 
-	var size: float = 2.3 * inn._depth(at.y)
+	var size: float = 2.3 * inn._depth(at.y) * inn.kid_size()
 	rig.root_angle = 0.0
 	if inn.sleep == 2:
 		# Adeline is asleep, so she curls up on the floor beside the bed.
@@ -389,7 +390,7 @@ func frame(delta: float) -> void:
 			facing = 1 if to.x > 0.0 else -1
 		walk += pace * delta * 0.034
 		pose = Moves.girl_run(walk, 0.55 if play == "balloon" else 0.35)
-	elif play == "" and styling < 0:
+	elif play == "" and styling < 0 and not hold:
 		facing = 1 if inn.at.x >= at.x else -1  # she watches her big sister
 	var lift := float(pose["_lift"])
 	pose.erase("_lift")

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://caxbtikeie1u6"
-path="res://.godot/imported/food.png-3d8a47101cc6dd7fb49e45b7bdcdbda2.ctex"
+uid="uid://b5w8jk67ik8kj"
+path="res://.godot/imported/plate.png-9416c0d80b0f6895b6cba73a9b3c6f93.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://art/room/food.png"
-dest_files=["res://.godot/imported/food.png-3d8a47101cc6dd7fb49e45b7bdcdbda2.ctex"]
+source_file="res://art/room/kitchen/plate.png"
+dest_files=["res://.godot/imported/plate.png-9416c0d80b0f6895b6cba73a9b3c6f93.ctex"]
 
 [params]
 

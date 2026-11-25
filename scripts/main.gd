@@ -216,6 +216,10 @@ func _ready() -> void:
 	dialog.set_script(DialogScript)
 	dialog.game = self
 	layer.add_child(dialog)
+	var curtain := Control.new()
+	curtain.set_script(preload("res://scripts/curtain.gd"))
+	curtain.game = self
+	layer.add_child(curtain)
 
 	# Everything in the world stops when a menu is open. The menu itself, drawn by the
 	# heads-up display, and the sound do not.
@@ -1598,6 +1602,11 @@ func _draw_merlin_mark(g: float) -> void:
 	# A bobbing mark over Merlin when he has something new to say.
 	if mode == "play" and merlin_has_news():
 		var bob := sin(clock * 4.0) * 5.0
+		# It sits in a glow, and a ring spreads from it every second or so to catch the eye.
+		var middle := Vector2(MERLIN_X, g - 208.0 + bob)
+		var beat := fmod(clock * 0.9, 1.0)
+		draw_arc(middle, 24.0 + beat * 34.0, 0.0, TAU, 40, Color(1.0, 0.85, 0.2, 0.7 * (1.0 - beat)), 4.0)
+		draw_circle(middle, 30.0, Color(1.0, 0.9, 0.4, 0.22))
 		draw_rect(Rect2(MERLIN_X - 5.0, g - 226.0 + bob, 10.0, 26.0), Color(1.0, 0.85, 0.2))
 		draw_circle(Vector2(MERLIN_X, g - 188.0 + bob), 6.0, Color(1.0, 0.85, 0.2))
 
