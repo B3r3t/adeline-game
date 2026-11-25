@@ -55,8 +55,8 @@ point: her little sister is needed three times.
 ## The look and feel of the whole game
 
 - **Title screen.** A painting of the sisters, Spirit, the pony and the unicorn, the logo,
-  and four cards: Adventure, Riding course, Horse race, Fly the unicorn. The three games
-  each show the course last chosen and the stars won on it; the arrows at the ends of a card
+  and five cards: Adventure, Riding course, Horse race, Fly the unicorn, Farm games. The
+  riding, racing and flying cards each show the course last chosen and the stars won on it; the arrows at the ends of a card
   step through every course reached so far (one past the last one finished).
 - **Menus.** "Settings" on the title screen and the Menu button everywhere else open the
   same panel: Sound, Music, Buttons (small, medium, large), Goblin fights (normal or easy),
@@ -80,7 +80,7 @@ point: her little sister is needed three times.
   - Menus, the speech box, results and "try again" panels pop open. Words in the speech
     box arrive a word at a time and the speaker's portrait nods as each line starts.
   - On a results panel the stars arrive one at a time, each with a higher chime.
-  - The title: the name drops in, the four cards come up one after another, the painting
+  - The title: the name drops in, the cards come up one after another, the painting
     drifts slowly and stars twinkle on it.
   - A new goal swells and lights up; messages slide in; counters (rings, stars, place in a
     race) jump when they change; hearts shake when one is lost and the lost one floats off.
@@ -266,6 +266,44 @@ The table, chairs, tableware and food are cut from generated sheets by
 `art_src/build_kitchen.py` into `art/room/kitchen`, which also reshapes the table (a
 deeper top, shorter legs) and writes the size each thing is drawn at.
 
+## Farm games
+
+Five little games, reached from the fifth card on the title screen. Each is played on its
+own painted scene, takes a minute or so, cannot be lost, and ends with one to three stars;
+the best for each is kept (`mini_stars` in the save). The pause menu has a way back to the
+list. Three are Adeline's own and two she plays with her little sister.
+
+- **Apple picking.** Grandma's list is at the top: six red apples, four green, two golden.
+  Apples ripen along the bottom of the old tree, shiver and drop. Hold a finger where
+  Adeline should run and she catches them in her basket. Wormy apples are best left to
+  fall; three stars for catching none. Grandma comes out with the pie at the end.
+- **Lost lambs.** Six lambs are scattered over the meadow and the sun is going down
+  (90 seconds). Tap where Adeline should walk; a lamb she reaches follows her in a line,
+  and at the barn they hop in one by one. One is stuck in a bramble bush: stand by it
+  until the ring fills. A fox comes by every so often. If it gets among the lambs they
+  bolt back to where they were; tap it and Adeline shoos it off. Lambs still out at
+  nightfall find their own way in, for one star.
+- **Merlin's potions.** A memory game. Merlin drops ingredients into the cauldron, each
+  with its own note, then Adeline taps the same ones in the same order. Four potions of
+  two, three, four and five ingredients. A wrong one makes grey smoke and Merlin shows
+  the potion again. A frog comes out of the last one.
+- **Hide and seek.** Adeline counts to three with her eyes shut while her sister hides
+  behind one of eight things in the farmyard. Every few seconds she peeks out and giggles;
+  tap what she is behind and Adeline goes to look. From the second round a hen, a cat, a
+  rabbit or a mouse hide too, and peek too. Three rounds, with shorter peeks each time.
+- **Pony wash.** The pony is muddy. Rub each splat with the sponge, hold a finger where
+  her sister should point the hose until the soap is gone, then rub her dry with the
+  towel until every patch shines. She gets a bow at the end. Quicker hands, more stars.
+
+How they are built: `scripts/mini.gd` sets up the scene (scaled to cover the screen;
+anything that matters stays inside `SAFE`, so nothing is lost on a long phone or a squarer
+tablet), passes touches to the game, and shows the opening card and the stars. A game
+script has `begin`, `how`, `go`, `frame`, `press`, `drag`, `release` and `draw_ui`, and
+calls `host.finish(stars, line)` when it is over. Adding a sixth is one more script and
+one more line in `LIST`. The numbers that set how hard each is are constants at the top
+of its file. The pictures are cut from generated sheets by `art_src/build_mini.py` into
+`art/mini`.
+
 ## At home
 
 Near the front door a "Go into the house" button appears, and near the stable a "Visit
@@ -318,12 +356,16 @@ Spirit's stable" button.
   race horses, the pony) are quieter and fade out with distance.
 - Effects for the wand, fireball, shield, rings, knocked rails, rolling bales and landings.
 - Sound and music are turned on and off in the settings and pause menus, and remembered.
-- **Music.** Five looping tunes: the island and title, goblin fights, riding and racing, the
-  sky, and indoors. One fades into the next, and music dips while someone is speaking.
+- **Music.** Six looping tunes: the island and title, goblin fights, riding and racing, the
+  sky, indoors, and a bouncy one for the farm games. One fades into the next, and music dips while someone is speaking.
   Behind it there is quiet birdsong outdoors and wind in the sky. The tunes were made with a
   music generator and asked for without singing; the recordings are in `art_src/music` and
   `art_src/build_audio.py` makes each into a loop with no seam.
 - The little sister's lines in conversation are spoken as well as Merlin's.
+- In the farm games Adeline, her sister and Merlin call out as things happen, and the
+  animals have their own sounds (lamb, hen, cat, mouse, frog, fox). Those animal sounds
+  were generated and are in `art_src/voice` as `fx_*.mp3`; the splash, puff of smoke,
+  sponge and hose are made from scratch like the other effects.
 - The voices were recorded with a text-to-speech service (Adeline uses the "Ainsley" voice and Merlin the "Landon" voice, both picked by ear). The effects are made from scratch
   by `art_src/build_audio.py`, which also trims and levels the recordings and writes
   `audio/manifest.json`. `scripts/sound.gd` plays everything; a sound missing from the list is
@@ -408,6 +450,9 @@ How movement stays smooth
 - `scripts/mission2.gd` and `scripts/mission3.gd` are the two later missions.
 - `scripts/sky.gd` is the sky ride. `scripts/ride.gd` is the riding course and the race.
 - `scripts/curtain.gd` opens each new place out of the dark.
+- `scripts/mini.gd` is the frame the five farm games run in, and the list they are chosen
+  from. Each game is its own file: `mini_apples.gd`, `mini_lambs.gd`, `mini_potions.gd`,
+  `mini_hide.gd`, `mini_wash.gd`.
 - `scripts/scenery.gd` is the sky, trees, flowers and animals. `scripts/ui.gd` is how panels
   and buttons are drawn. `scripts/sound.gd` plays every sound and the music.
 - `.github/workflows/build-apk.yml` builds the app.

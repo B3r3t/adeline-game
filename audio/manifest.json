@@ -93,6 +93,33 @@
   "good_girl": [
    "a_good_girl.ogg"
   ],
+  "apples": [
+   "a_apples.ogg"
+  ],
+  "yuck": [
+   "a_yuck.ogg"
+  ],
+  "lambs": [
+   "a_lambs.ogg"
+  ],
+  "shoo": [
+   "a_shoo.ogg"
+  ],
+  "ready_or_not": [
+   "a_ready.ogg"
+  ],
+  "found_you": [
+   "a_found.ogg"
+  ],
+  "not_here": [
+   "a_not_here.ogg"
+  ],
+  "bath_time": [
+   "a_bath.ogg"
+  ],
+  "my_turn": [
+   "a_my_turn.ogg"
+  ],
   "sister_hello": [
    "s_hi.ogg"
   ],
@@ -141,6 +168,24 @@
   ],
   "sister_higher": [
    "s_higher.ogg"
+  ],
+  "sister_hide": [
+   "s_hide.ogg"
+  ],
+  "sister_found": [
+   "s_found.ogg"
+  ],
+  "sister_giggle": [
+   "s_giggle.ogg"
+  ],
+  "sister_splash": [
+   "s_splash.ogg"
+  ],
+  "sister_sparkly": [
+   "s_sparkly.ogg"
+  ],
+  "sister_muddy": [
+   "s_muddy.ogg"
   ],
   "ogre_roar": [
    "o_roar.ogg"
@@ -247,6 +292,54 @@
   ],
   "zap": [
    "zap.ogg"
+  ],
+  "merlin_watch": [
+   "m_watch.ogg"
+  ],
+  "merlin_turn": [
+   "m_turn.ogg"
+  ],
+  "merlin_splendid": [
+   "m_splendid.ogg",
+   "m_perfect.ogg"
+  ],
+  "merlin_oops": [
+   "m_oops.ogg"
+  ],
+  "bleat": [
+   "fx_bleat.ogg",
+   "fx_bleat2.ogg"
+  ],
+  "cluck": [
+   "fx_cluck.ogg"
+  ],
+  "meow": [
+   "fx_meow.ogg"
+  ],
+  "ribbit": [
+   "fx_ribbit.ogg"
+  ],
+  "yip": [
+   "fx_yip.ogg"
+  ],
+  "squeak": [
+   "fx_squeak.ogg"
+  ],
+  "splash": [
+   "splash_0.ogg",
+   "splash_1.ogg"
+  ],
+  "poof": [
+   "poof.ogg"
+  ],
+  "scrub": [
+   "scrub_0.ogg",
+   "scrub_1.ogg",
+   "scrub_2.ogg"
+  ],
+  "spray": [
+   "spray_0.ogg",
+   "spray_1.ogg"
   ]
  },
  "lines": {
@@ -281,7 +374,8 @@
   "fight": "music_fight.ogg",
   "ride": "music_ride.ogg",
   "sky": "music_sky.ogg",
-  "cozy": "music_cozy.ogg"
+  "cozy": "music_cozy.ogg",
+  "play": "music_play.ogg"
  },
  "ambience": {
   "birds": "amb_birds.ogg",

@@ -329,12 +329,49 @@ def zap(dice):
     return fade(x, 0.002, 0.05)
 
 
+def splash(dice):
+    """Something dropped into a pot of liquid: a plop and a short wet spray."""
+    n = int(SR * 0.4)
+    k = np.arange(n) / SR
+    plop = np.sin(2 * np.pi * np.cumsum(260 + 520 * np.exp(-k / 0.05)) / SR) * np.exp(-k / 0.07)
+    spray = signal.sosfilt(signal.butter(2, [1400, 6000], btype="band", fs=SR, output="sos"), dice.standard_normal(n)) * np.exp(-k / 0.11) * np.minimum(k / 0.02, 1.0)
+    return fade(plop * 0.8 + spray * 0.5, 0.003, 0.06)
+
+
+def poof(dice):
+    """A puff of magic smoke: a soft thump of air with a falling shimmer on top."""
+    n = int(SR * 0.6)
+    k = np.arange(n) / SR
+    air = signal.sosfilt(signal.butter(2, [180, 1600], btype="band", fs=SR, output="sos"), dice.standard_normal(n)) * np.exp(-k / 0.16) * np.minimum(k / 0.012, 1.0)
+    shimmer = sum(np.sin(2 * np.pi * f * (1.0 - 0.25 * k / k[-1]) * k) for f in (1760.0, 2217.0, 2637.0)) * np.exp(-k / 0.2) * 0.12
+    return fade(air * 0.9 + shimmer, 0.004, 0.08)
+
+
+def scrub(dice):
+    """A soapy sponge rubbed back and forth once: two short wet strokes."""
+    n = int(SR * 0.3)
+    k = np.arange(n) / SR
+    strokes = np.abs(np.sin(np.pi * k / 0.15)) ** 0.7
+    x = signal.sosfilt(signal.butter(2, [900, 3800], btype="band", fs=SR, output="sos"), dice.standard_normal(n)) * strokes
+    squeak = np.sin(2 * np.pi * np.cumsum(700 + 500 * strokes) / SR) * strokes * 0.08
+    return fade(x * 0.8 + squeak, 0.01, 0.04)
+
+
+def spray(dice):
+    """Water from a hose for a moment: a steady bright hiss that can be played end to end."""
+    n = int(SR * 0.36)
+    x = signal.sosfilt(signal.butter(2, 2200, btype="high", fs=SR, output="sos"), dice.standard_normal(n))
+    low = signal.sosfilt(signal.butter(2, [300, 900], btype="band", fs=SR, output="sos"), dice.standard_normal(n)) * 0.4
+    return fade((x + low) * (0.85 + 0.15 * np.sin(2 * np.pi * 9.0 * np.arange(n) / SR)), 0.05, 0.08)
+
+
 # Music and background sound, made into loops. For each: the recording (in ../music),
 # how many seconds of lead-in to drop, how long a piece to keep (0 for all of it), how
 # long the join is, and how loud to make it.
 MUSIC = {
     "home": ("home.mp3", 0.0, 0.0, 3.0, -20), "fight": ("fight.mp3", 0.0, 0.0, 3.0, -20), "ride": ("ride.mp3", 15.0, 0.0, 3.0, -20),
     "sky": ("sky.mp3", 0.0, 0.0, 3.0, -20), "cozy": ("cozy.mp3", 0.0, 0.0, 3.0, -20),
+    "play": ("play.mp3", 0.0, 0.0, 3.0, -20),
 }
 AMBIENCE = {"birds": ("birds.mp3", 0.3, 12.5, 2.0, -30), "wind": ("wind.mp3", 0.3, 0.0, 2.5, -30)}
 
@@ -442,6 +479,15 @@ ADELINE = {
     "so_high": ["a_so_high"],
     "call_unicorn": ["a_call_unicorn"],
     "good_girl": ["a_good_girl"],
+    "apples": ["a_apples"],
+    "yuck": ["a_yuck"],
+    "lambs": ["a_lambs"],
+    "shoo": ["a_shoo"],
+    "ready_or_not": ["a_ready"],
+    "found_you": ["a_found"],
+    "not_here": ["a_not_here"],
+    "bath_time": ["a_bath"],
+    "my_turn": ["a_my_turn"],
 }
 SISTER = {
     "sister_hello": ["s_hi"],
@@ -460,6 +506,28 @@ SISTER = {
     "sister_flying": ["s_flying"],
     "sister_uhoh": ["s_uhoh"],
     "sister_higher": ["s_higher"],
+    "sister_hide": ["s_hide"],
+    "sister_found": ["s_found"],
+    "sister_giggle": ["s_giggle"],
+    "sister_splash": ["s_splash"],
+    "sister_sparkly": ["s_sparkly"],
+    "sister_muddy": ["s_muddy"],
+}
+# Things Merlin calls out in the potion game, rather than says in conversation.
+MERLIN_CALLS = {
+    "merlin_watch": ["m_watch"],
+    "merlin_turn": ["m_turn"],
+    "merlin_splendid": ["m_splendid", "m_perfect"],
+    "merlin_oops": ["m_oops"],
+}
+# Animals in the farm games: name in the game -> recordings.
+ANIMALS = {
+    "bleat": ["fx_bleat", "fx_bleat2"],
+    "cluck": ["fx_cluck"],
+    "meow": ["fx_meow"],
+    "ribbit": ["fx_ribbit"],
+    "yip": ["fx_yip"],
+    "squeak": ["fx_squeak"],
 }
 OGRE = {
     "ogre_roar": ["o_roar"],
@@ -534,6 +602,16 @@ def main():
     dice = np.random.default_rng(301)  # their own dice, so the effects above come out as before
     sounds["wing"] = [save(out, "wing_%d" % v, wing(dice), 0.5) for v in range(3)]
     sounds["zap"] = [save(out, "zap", zap(dice), 0.6)]
+
+    for name, stems in MERLIN_CALLS.items():
+        sounds[name] = [f for f in (recorded(s, level=-16.0) for s in stems) if f]
+    for name, stems in ANIMALS.items():
+        sounds[name] = [f for f in (recorded(s, level=-19.0) for s in stems) if f]
+    wet = np.random.default_rng(402)  # dice of their own again
+    sounds["splash"] = [save(out, "splash_%d" % v, splash(wet), 0.6) for v in range(2)]
+    sounds["poof"] = [save(out, "poof", poof(wet), 0.7)]
+    sounds["scrub"] = [save(out, "scrub_%d" % v, scrub(wet), 0.5) for v in range(3)]
+    sounds["spray"] = [save(out, "spray_%d" % v, spray(wet), 0.45) for v in range(2)]
 
     tunes = os.path.join(os.path.dirname(os.path.abspath(raw)), "music")
     music = {name: loop(os.path.join(tunes, how[0]), out, "music_" + name, how[1], how[2], how[3], how[4], 2) for name, how in MUSIC.items()}

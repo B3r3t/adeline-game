@@ -147,6 +147,8 @@ func _draw_screen(s: Vector2) -> void:
 	if game.mode == "title":
 		_draw_title(s)
 		return
+	if game.mode == "games":
+		return
 	if not game.dialog.active:
 		# The menu button: two bars, as on a music player.
 		var m: Rect2 = game.menu_rect()
@@ -160,7 +162,7 @@ func _draw_screen(s: Vector2) -> void:
 	if game.mode == "sky":
 		_draw_sky(s)
 		return
-	if game.mode == "house" or game.mode == "stable":
+	if game.mode == "house" or game.mode == "stable" or game.mode == "mini":
 		return
 	if game.place_action != "" and not game.dialog.active:
 		_pop(game.enter_rect().get_center(), _age("enter"))
@@ -396,7 +398,13 @@ func _draw_title(s: Vector2) -> void:
 		var r: Rect2 = game.card_rect(i)
 		r.position.y += (1.0 - Ui.pop((age - 0.3 - i * 0.09) / 0.5)) * 300.0  # the cards come up one after another
 		Ui.button(self, font, r, "", 20, Color(info["color"].r, info["color"].g, info["color"].b, 0.96))
-		_text(Vector2(r.position.x, r.position.y + 46.0), str(info["label"]), 27, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
+		_text(Vector2(r.position.x, r.position.y + 46.0), str(info["label"]), 27 if r.size.x >= 250.0 else 24, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
+		if str(info["id"]) == "games":
+			# Five little games of their own, and the stars won across them.
+			_text(Vector2(r.position.x, r.position.y + 82.0), "%d little games" % game.mini.LIST.size(), 20, Color(1.0, 0.95, 0.7), HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
+			Ui.star(self, Vector2(r.get_center().x - 34.0, r.position.y + 103.0), 10.0, true)
+			_text(Vector2(r.get_center().x - 18.0, r.position.y + 110.0), "%d of %d" % [game.mini.total_stars(), game.mini.LIST.size() * 3], 18, Color.WHITE)
+			continue
 		if i == 0:
 			var line := "Start here" if not saved else str(game.objective())
 			_text(Vector2(r.position.x + 12.0, r.position.y + 90.0), line, 19, Color(1.0, 0.95, 0.7), HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 24.0)

@@ -16,6 +16,7 @@ const SisterScript := preload("res://scripts/sister.gd")
 const Mission2Script := preload("res://scripts/mission2.gd")
 const Mission3Script := preload("res://scripts/mission3.gd")
 const SkyScript := preload("res://scripts/sky.gd")
+const MiniScript := preload("res://scripts/mini.gd")
 const SceneryScript := preload("res://scripts/scenery.gd")
 
 const GROUND_Y := 560.0
@@ -92,6 +93,7 @@ var ride = null  # the riding course
 var sound = null  # voices, grunts and effects
 var sound_on := true
 var indoors = null  # the living room and the stable
+var mini = null  # the farm games
 var place_action := ""  # a building Adeline is standing at: house or stable
 var zoom := CAMERA_ZOOM
 var merlin: Sprite2D
@@ -216,6 +218,11 @@ func _ready() -> void:
 	dialog.set_script(DialogScript)
 	dialog.game = self
 	layer.add_child(dialog)
+	mini = Control.new()
+	mini.set_script(MiniScript)
+	mini.game = self
+	layer.add_child(mini)
+	layer.move_child(mini, hud.get_index())  # under the menu button and the speech box
 	var curtain := Control.new()
 	curtain.set_script(preload("res://scripts/curtain.gd"))
 	curtain.game = self
@@ -226,7 +233,7 @@ func _ready() -> void:
 	for child in get_children():
 		if child != layer and child != sound:
 			child.process_mode = Node.PROCESS_MODE_PAUSABLE
-	for child in [indoors, controls, dialog]:
+	for child in [indoors, controls, dialog, mini]:
 		child.process_mode = Node.PROCESS_MODE_PAUSABLE
 	_load()
 	_place_player()
@@ -404,7 +411,7 @@ func _add_wall(rect: Rect2) -> void:
 # --- Saved progress ---------------------------------------------------------
 
 func _default_data() -> Dictionary:
-	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "hair": 0, "m2": "available", "m2_step": 0, "m2_thanked": false, "m3": "available", "m3_step": 0, "m3_clues": 0, "m3_thanked": false, "mount": "spirit", "sky_course": 1, "sky_stars": {} }
+	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "hair": 0, "m2": "available", "m2_step": 0, "m2_thanked": false, "m3": "available", "m3_step": 0, "m3_clues": 0, "m3_thanked": false, "mount": "spirit", "sky_course": 1, "sky_stars": {}, "mini_stars": {} }
 
 
 func has_save() -> bool:
@@ -590,7 +597,7 @@ func _update_limits() -> void:
 
 
 func input_locked() -> bool:
-	return mode == "title" or mode == "house" or mode == "stable" or mode == "sky" or dialog.active or defeated or (mode == "ride" and ride.finished) or (mode == "play" and (sister.busy() or mission2.fading()))
+	return mode == "title" or mode == "games" or mode == "mini" or mode == "house" or mode == "stable" or mode == "sky" or dialog.active or defeated or (mode == "ride" and ride.finished) or (mode == "play" and (sister.busy() or mission2.fading()))
 
 
 ## A little cloud of dust on the ground.
@@ -1090,14 +1097,15 @@ const GAMES := [
 	{ "id": "ride", "label": "Riding course", "color": Color(0.26, 0.6, 0.36), "course": "ride_course", "stars": "ride_stars", "word": "Course" },
 	{ "id": "race", "label": "Horse race", "color": Color(0.82, 0.5, 0.14), "course": "race_course", "stars": "race_stars", "word": "Race" },
 	{ "id": "sky", "label": "Fly the unicorn", "color": Color(0.62, 0.36, 0.8), "course": "sky_course", "stars": "sky_stars", "word": "Sky" },
+	{ "id": "games", "label": "Farm games", "color": Color(0.86, 0.34, 0.5) },
 ]
 const CARD_ARROW := 50.0  # how wide the arrow at each end of a card is
 
 
 func card_rect(i: int) -> Rect2:
 	var s := get_viewport_rect().size
-	var wide := (s.x - 72.0 - 42.0) / 4.0
-	return Rect2(36.0 + i * (wide + 14.0), s.y - 158.0, wide, 124.0)
+	var wide := (s.x - 72.0 - 12.0 * (GAMES.size() - 1)) / GAMES.size()
+	return Rect2(36.0 + i * (wide + 12.0), s.y - 158.0, wide, 124.0)
 
 
 ## The furthest course of a game that may be chosen: one past the last one finished.
@@ -1118,6 +1126,9 @@ func _tap_card(i: int, pos: Vector2) -> void:
 	var r := card_rect(i)
 	if i == 0:
 		_start(not has_save())
+		return
+	if str(GAMES[i]["id"]) == "games":
+		mini.open_list()
 		return
 	var number := chosen(i)
 	if pos.x < r.position.x + CARD_ARROW or pos.x > r.end.x - CARD_ARROW:
@@ -1178,6 +1189,8 @@ func menu_rows() -> Array:
 	rows.append(["buttons", "Buttons: %s" % ["small", "medium", "large"][button_size]])
 	rows.append(["fights", "Goblin fights: easy" if easy_fights else "Goblin fights: normal"])
 	if menu == "pause":
+		if mode == "mini":
+			rows.append(["games", "Back to the farm games"])
 		rows.append(["home", "Go to the title screen"])
 	else:
 		if has_save():
@@ -1225,6 +1238,9 @@ func _tap_menu(pos: Vector2) -> void:
 		"home":
 			close_menu()
 			go_title()
+		"games":
+			close_menu()
+			mini.open_list()
 		"new":
 			if new_game_armed:
 				close_menu()
@@ -1383,6 +1399,7 @@ func on_ride_finished(number: int, stars: int) -> void:
 
 func go_title() -> void:
 	if not dialog.active:
+		mini.close()
 		mode = "title"
 		_place_player()
 		sound.hush()
@@ -1417,6 +1434,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			for i in GAMES.size():
 				if card_rect(i).has_point(pos):
 					_tap_card(i, pos)
+	elif mode == "games":
+		pass  # the list of farm games answers its own taps
 	elif has_pos and menu_rect().has_point(pos):
 		open_menu("pause")
 	elif mode == "play" and place_action != "" and has_pos and enter_rect().has_point(pos) and not dialog.active:
@@ -1529,6 +1548,11 @@ func _set_the_mood() -> void:
 		"house", "stable":
 			tune = "cozy"
 			air = ""
+		"games", "mini":
+			tune = "play"
+			if mini.which >= 0 and str(mini.LIST[mini.which]["scene"]) == "hut":
+				tune = "cozy"
+				air = ""
 	sound.want(tune, air)
 
 
