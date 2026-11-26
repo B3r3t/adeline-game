@@ -5,6 +5,7 @@ extends Node2D
 ## hold a finger on the screen and she goes to it. Wormy apples are best left to fall.
 ## When the list is filled Grandma comes out with the pie.
 
+const Season := preload("res://scripts/season.gd")
 const Ui := preload("res://scripts/ui.gd")
 
 const GROUND := 664.0
@@ -37,7 +38,7 @@ func begin() -> void:
 	who["speed"] = 560.0
 	basket = host.picture("res://art/mini/basket.png", Vector2.ZERO, 140.0)
 	for kind in KINDS + ["worm"]:
-		icons[kind] = load("res://art/mini/apple_%s.png" % kind)
+		icons[kind] = Season.tex("res://art/mini/apple_%s.png" % kind)
 		jumped[kind] = 9.0
 
 
@@ -105,7 +106,7 @@ func frame(delta: float) -> void:
 	host.step(who, delta, { "arm_upper": -62.0, "arm_lower": -34.0 })
 	var total := int(got["red"]) + int(got["green"]) + int(got["gold"])
 	if total == 5:
-		basket.texture = load("res://art/mini/basket_full.png")
+		basket.texture = Season.tex("res://art/mini/basket_full.png")
 	basket.position = mouth() + Vector2(sin(shake * 50.0) * 8.0 * shake, 84.0)
 	basket.z_index = int(GROUND) + 2
 	if playing and over < 0.0:
@@ -220,7 +221,7 @@ func _ending(delta: float) -> void:
 			if randf() < delta * 5.0:
 				host.spark(pie.position + Vector2(randf_range(-30.0, 30.0), -50.0), "smoke", Color(1.0, 1.0, 1.0))
 			if over > 2.4:
-				host.finish(3 if worms == 0 else (2 if worms <= 2 else 1), "Grandma's apple pie is the best yet." if worms == 0 else "The pie is baked, worms and all!")
+				host.finish(3 if worms == 0 else (2 if worms <= 2 else 1), ("Grandma's Christmas pie is the best yet." if Season.festive() else "Grandma's apple pie is the best yet.") if worms == 0 else "The pie is baked, worms and all!")
 
 
 func draw_ui(on: Control, s: Vector2) -> void:

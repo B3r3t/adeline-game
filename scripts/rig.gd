@@ -3,6 +3,8 @@ extends Node2D
 ## The parts and their joints come from a rig file made by art_src/build_rig.py.
 ## Set angles in `pose` (degrees, by part name), then call apply().
 
+const Season := preload("res://scripts/season.gd")
+
 var order: Array = []  # part names, parents before children
 var info := {}  # name -> { parent, pos, sprite }
 var pose := {}  # name -> degrees
@@ -74,6 +76,7 @@ func build(dir: String) -> void:
 		node.scale = Vector2(tex_scale, tex_scale)
 		add_child(node)
 		info[p["name"]]["sprite"] = node
+	Season.dress(self, dir)  # a hat, at Christmas
 	snap()
 
 

@@ -111,6 +111,12 @@
   "found_you": [
    "a_found.ogg"
   ],
+  "merry": [
+   "a_merry.ogg"
+  ],
+  "present": [
+   "a_present.ogg"
+  ],
   "not_here": [
    "a_not_here.ogg"
   ],
@@ -177,6 +183,10 @@
   ],
   "sister_giggle": [
    "s_giggle.ogg"
+  ],
+  "sister_merry": [
+   "s_merry.ogg",
+   "s_snowing.ogg"
   ],
   "sister_splash": [
    "s_splash.ogg"
@@ -306,6 +316,9 @@
   "merlin_oops": [
    "m_oops.ogg"
   ],
+  "merlin_merry": [
+   "m_merry.ogg"
+  ],
   "bleat": [
    "fx_bleat.ogg",
    "fx_bleat2.ogg"
@@ -375,7 +388,11 @@
   "ride": "music_ride.ogg",
   "sky": "music_sky.ogg",
   "cozy": "music_cozy.ogg",
-  "play": "music_play.ogg"
+  "play": "music_play.ogg",
+  "x_home": "music_x_home.ogg",
+  "x_cozy": "music_x_cozy.ogg",
+  "x_play": "music_x_play.ogg",
+  "x_ride": "music_x_ride.ogg"
  },
  "ambience": {
   "birds": "amb_birds.ogg",

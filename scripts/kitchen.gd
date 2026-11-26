@@ -14,6 +14,7 @@ extends Node
 ##
 ## This is a child of the indoors scene and uses its room: the floor, the sizes, Adeline.
 
+const Season := preload("res://scripts/season.gd")
 const Ui := preload("res://scripts/ui.gd")
 
 const ROUND := 200.0  # seconds for the whole round
@@ -52,6 +53,11 @@ const MENU := {
 		["mash", -218.0, 0.72, true], ["chicken", -70.0, 0.76, true], ["peas", 74.0, 0.7, true],
 		["rolls", 196.0, 0.72, false], ["pie", 306.0, 0.72, false], ["gravy", 136.0, 0.95, false]] },
 }
+# At Christmas dinner is Christmas dinner, there is hot chocolate for the girls, and a
+# candle burns in the middle of the table instead of the flowers.
+const CHRISTMAS := { "plate": "plate_roast", "done": "plate_done", "dishes": [
+	["mash", -218.0, 0.72, true], ["turkey", -70.0, 0.76, true], ["peas", 74.0, 0.7, true],
+	["gingerbread", 196.0, 0.74, false], ["pudding", 306.0, 0.72, false], ["cookies", 136.0, 0.97, false]] }
 const FLAT := ["plate", "plate_roast", "plate_pancakes", "plate_done", "bowl_soup", "bowl_done"]  # lie on the table rather than stand on it
 const SERVE := 0.9  # serving dishes are drawn a little under their full size, so the plates show
 
@@ -99,6 +105,18 @@ func meal() -> String:
 	return MEALS[int(Time.get_unix_time_from_system() / ROUND) % MEALS.size()]
 
 
+## What this meal puts on the table.
+func menu() -> Dictionary:
+	if Season.festive() and meal() == "dinner":
+		return CHRISTMAS
+	return MENU[meal()]
+
+
+## What the meal is called: "breakfast", "lunch", "dinner", or at Christmas "Christmas dinner".
+func meal_name() -> String:
+	return "Christmas dinner" if (Season.festive() and meal() == "dinner") else meal().capitalize()
+
+
 func closed() -> void:
 	_stand_up()
 	table = null
@@ -141,7 +159,7 @@ func entered_room() -> void:
 	told = ""
 	var floor_y: float = inn._front() - 26.0
 	table = Sprite2D.new()
-	table.texture = load("res://art/room/kitchen/table.png")
+	table.texture = Season.tex("res://art/room/kitchen/table.png")
 	var k: float = float(sizes["table"]) / table.texture.get_width()
 	table.scale = Vector2(k, k)
 	table.offset = Vector2(0.0, -table.texture.get_height() / 2.0)
@@ -160,7 +178,7 @@ func entered_room() -> void:
 	inn.stage.add_child(shade)
 	for seat in SEATS:
 		var chair := Sprite2D.new()
-		chair.texture = load("res://art/room/kitchen/chair.png")
+		chair.texture = Season.tex("res://art/room/kitchen/chair.png")
 		var c: float = float(sizes["chair"]) / chair.texture.get_width() * _far_size()
 		chair.scale = Vector2(c, c)
 		# Only the back of the chair shows, over the far edge of the table.
@@ -209,7 +227,7 @@ func _spot(across: float, near: float) -> Vector2:
 ## A picture standing on the floor at `feet`, sized for how far back it is.
 func _put(path: String, feet: Vector2, size: float) -> Sprite2D:
 	var sprite := Sprite2D.new()
-	sprite.texture = load(path)
+	sprite.texture = Season.tex(path)
 	var k: float = size * inn._depth(feet.y)
 	sprite.scale = Vector2(k, k)
 	sprite.offset = Vector2(0.0, -sprite.texture.get_height() / 2.0)
@@ -248,25 +266,28 @@ func _places() -> Array:
 func _wanted() -> Dictionary:
 	var now := phase()
 	var p := progress()
-	var out := { "vase": ["vase", -322.0, 0.62], "salt": ["salt", -128.0, 0.95] }
+	var out := { "vase": ["candle" if Season.festive() else "vase", -322.0, 0.62], "salt": ["salt", -128.0, 0.95] }
 	if now == "away":
 		return out
-	var menu: Dictionary = MENU[meal()]
+	var fare: Dictionary = menu()
 	var places := _places()
 	# While the cooking is going on the table is laid a place at a time, then the dishes
 	# come out one by one. By the time everyone sits down it is all there.
 	var set_out := places.size() if now == "eat" else int(clampf(p / 0.55, 0.0, 1.0) * places.size())
-	var dishes: Array = menu["dishes"]
+	var dishes: Array = fare["dishes"]
 	var out_now := dishes.size() if now == "eat" else int(clampf((p - 0.6) / 0.4, 0.0, 1.0) * dishes.size())
 	for i in set_out:
 		var seat := int(places[i])
 		var plate := "plate"
 		if now == "eat":
-			plate = str(menu["plate"] if p < 0.72 else menu["done"])
-		elif str(menu["plate"]).begins_with("bowl"):
+			plate = str(fare["plate"] if p < 0.72 else fare["done"])
+		elif str(fare["plate"]).begins_with("bowl"):
 			plate = "bowl_done"  # soup bowls go out empty
 		out["plate%d" % seat] = [plate, float(SEATS[seat]), 0.2]
-		out["drink%d" % seat] = ["milk" if seat >= SISTER_SEAT else "mug", float(SEATS[seat]) + 57.0, 0.07]
+		var drink := "milk" if seat >= SISTER_SEAT else "mug"
+		if Season.festive() and seat >= SISTER_SEAT:
+			drink = "cocoa"
+		out["drink%d" % seat] = [drink, float(SEATS[seat]) + 57.0, 0.07]
 	for i in out_now:
 		out["dish%d" % i] = [str(dishes[i][0]), float(dishes[i][1]), float(dishes[i][2])]
 	return out
@@ -286,7 +307,7 @@ func _lay() -> void:
 		var picture := str(want[id][0])
 		var near := float(want[id][2])
 		var thing := Sprite2D.new()
-		thing.texture = load("res://art/room/kitchen/%s.png" % picture)
+		thing.texture = Season.tex("res://art/room/kitchen/%s.png" % picture)
 		var flat := picture in FLAT
 		var wide := float(sizes[picture]) * (SERVE if str(id).begins_with("dish") else 1.0)
 		var k: float = wide / thing.texture.get_width() * lerpf(0.9, 1.0, near)
@@ -326,7 +347,10 @@ func _input(event: InputEvent) -> void:
 		if seated:
 			# Round the back of the table, to her own place at the end.
 			inn.goal = _behind(ADELINE_SEAT)
-			game.sound.shout("adeline", "woohoo", 0.4)
+			if Season.festive():
+				game.sound.shout("adeline", "merry", 1.0)
+			else:
+				game.sound.shout("adeline", "woohoo", 0.4)
 		else:
 			inn.goal = Vector2(TABLE_AT + 420.0, table.position.y + 14.0)
 		inn.get_viewport().set_input_as_handled()
@@ -338,10 +362,9 @@ func draw_ui(s: Vector2) -> void:
 	if table == null:
 		return
 	var now := phase()
-	var name := meal()
-	var line := "Something smells good. %s is nearly ready." % name.capitalize()
+	var line := "Something smells good. %s is nearly ready." % meal_name()
 	if now == "eat":
-		line = "%s is on the table!" % name.capitalize()
+		line = "%s is on the table!" % meal_name()
 	elif now == "away":
 		line = "The kitchen is quiet. Somebody will be cooking again soon."
 	var wide: float = inn.font.get_string_size(line, HORIZONTAL_ALIGNMENT_LEFT, -1, 24).x + 56.0
@@ -359,7 +382,7 @@ func _draw_steam(on: Node2D) -> void:
 	var from: Array = []
 	if now == "cook":
 		from.append(POT_AT)
-	var dishes: Array = MENU[meal()]["dishes"]
+	var dishes: Array = menu()["dishes"]
 	for i in dishes.size():
 		if bool(dishes[i][3]) and ware.has("dish%d" % i):
 			var dish: Sprite2D = ware["dish%d" % i]
@@ -389,7 +412,7 @@ func frame(delta: float) -> void:
 		_lay()
 	if now != told:
 		if told != "" and now == "eat":
-			inn._say("%s is ready!" % meal().capitalize())
+			inn._say("%s is ready!" % meal_name())
 			game.sound.play("chime", -6.0)
 		told = now
 	# Things just put down land with a small bounce.

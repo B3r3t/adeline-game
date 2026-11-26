@@ -5,6 +5,7 @@ extends Node2D
 ## of potion; get it wrong and it coughs grey smoke and Merlin shows her again. Four
 ## potions, each one ingredient longer than the last.
 
+const Season := preload("res://scripts/season.gd")
 const Ui := preload("res://scripts/ui.gd")
 
 const POT := Vector2(672.0, 604.0)  # where the cauldron's feet stand, on the hearth
@@ -41,6 +42,7 @@ var bottles: Array = []
 var bottle_art := {}
 var wave := 0.0
 var frog: Sprite2D = null
+var tapped := 9.0  # seconds since she last put something in, so a double tap is not two
 
 
 func begin() -> void:
@@ -58,7 +60,7 @@ func begin() -> void:
 		items.append(node)
 		lift[i] = 9.0
 	for name in BOTTLES:
-		bottle_art[name] = load("res://art/mini/%s.png" % name)
+		bottle_art[name] = Season.tex("res://art/mini/%s.png" % name)
 	z_index = 700  # the glow under each ingredient
 
 
@@ -97,7 +99,7 @@ func _go(to: String) -> void:
 
 
 func press(at: Vector2) -> void:
-	if phase != "turn":
+	if phase != "turn" or tapped < 0.3:
 		return
 	for i in items.size():
 		if at.distance_to(spot(i) + Vector2(0.0, -46.0)) < 80.0:
@@ -116,7 +118,7 @@ func release(_at: Vector2) -> void:
 ## Adeline drops ingredient `i` in. Right or wrong is known when it lands.
 func _put_in(i: int) -> void:
 	lift[i] = 0.0
-	who["hop"] = 0.0
+	tapped = 0.0
 	_throw(i)
 	if i == int(seq[step]):
 		step += 1
@@ -140,6 +142,7 @@ func mouth() -> Vector2:
 
 func frame(delta: float) -> void:
 	phase_time += delta
+	tapped += delta
 	wave += delta
 	for i in lift:
 		lift[i] = float(lift[i]) + delta

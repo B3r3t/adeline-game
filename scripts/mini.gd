@@ -13,6 +13,7 @@ extends Control
 ## phone a strip is lost off the top and bottom, and on a squarer tablet off the sides.
 ## Games keep everything that matters inside `SAFE`.
 
+const Season := preload("res://scripts/season.gd")
 const Ui := preload("res://scripts/ui.gd")
 const RigScript := preload("res://scripts/rig.gd")
 const Moves := preload("res://scripts/moves.gd")
@@ -22,7 +23,7 @@ const H := 752.0
 const SAFE := Rect2(84.0, 84.0, 1176.0, 588.0)
 
 const LIST := [
-	{ "id": "apples", "name": "Apple picking", "who": "Adeline", "line": "Catch what Grandma needs for her pie.", "scene": "orchard", "view": [0.5, 0.52, 0.8], "color": Color(0.82, 0.26, 0.22), "script": preload("res://scripts/mini_apples.gd") },
+	{ "id": "apples", "name": "Apple picking", "who": "Adeline", "line": "Catch what Grandma needs for her pie.", "winter": "Catch what Grandma needs for her Christmas pie.", "scene": "orchard", "view": [0.5, 0.52, 0.8], "color": Color(0.82, 0.26, 0.22), "script": preload("res://scripts/mini_apples.gd") },
 	{ "id": "lambs", "name": "Lost lambs", "who": "Adeline", "line": "Bring the lambs home before the sun sets.", "scene": "meadow", "view": [0.27, 0.36, 0.62], "color": Color(0.3, 0.62, 0.34), "script": preload("res://scripts/mini_lambs.gd") },
 	{ "id": "potions", "name": "Merlin's potions", "who": "Adeline", "line": "Watch what Merlin puts in, then do the same.", "scene": "hut", "view": [0.5, 0.48, 0.8], "color": Color(0.5, 0.34, 0.8), "script": preload("res://scripts/mini_potions.gd") },
 	{ "id": "hide", "name": "Hide and seek", "who": "With her sister", "line": "Where is she hiding? Watch for a peek.", "scene": "yard", "view": [0.33, 0.4, 0.7], "color": Color(0.9, 0.56, 0.16), "script": preload("res://scripts/mini_hide.gd") },
@@ -101,7 +102,7 @@ func start(i: int) -> void:
 	stage = Node2D.new()
 	add_child(stage)
 	var backdrop := Sprite2D.new()
-	backdrop.texture = load("res://art/mini/%s.jpg" % info["scene"])
+	backdrop.texture = Season.tex("res://art/mini/%s.jpg" % info["scene"])
 	backdrop.centered = false
 	backdrop.scale = Vector2(W, H) / backdrop.texture.get_size()
 	backdrop.z_index = -100
@@ -165,6 +166,19 @@ func playing() -> bool:
 	return state == "play"
 
 
+## Takes the finger off whatever it was doing. Called when the menu opens or the game is
+## put aside, when the lifting of the finger would otherwise never be heard of.
+func let_go() -> void:
+	if finger != -1 and play != null:
+		play.release(Vector2(-99.0, -99.0))
+	finger = -1
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_FOCUS_OUT or what == NOTIFICATION_APPLICATION_PAUSED:
+		let_go()
+
+
 func _layout() -> void:
 	if stage == null:
 		return
@@ -194,7 +208,7 @@ func picture_size(name: String) -> float:
 ## A picture in the scene, standing on `foot` and drawn `wide` across.
 func picture(path: String, foot: Vector2, wide: float, z := 0) -> Sprite2D:
 	var sprite := Sprite2D.new()
-	sprite.texture = load(path)
+	sprite.texture = Season.tex(path)
 	var k := wide / sprite.texture.get_width()
 	sprite.scale = Vector2(k, k)
 	sprite.offset = Vector2(0.0, -sprite.texture.get_height() / 2.0)
@@ -449,7 +463,7 @@ func _draw() -> void:
 		return
 	var s := get_viewport_rect().size
 	# The title painting, dimmed, behind the cards.
-	var art: Texture2D = load("res://art/ui/title.jpg")
+	var art: Texture2D = Season.tex("res://art/ui/title.jpg")
 	var size := art.get_size()
 	var k := maxf(s.x / size.x, s.y / size.y)
 	var shown := s / k
@@ -474,7 +488,7 @@ func _draw() -> void:
 		# A window onto the scene it is played in.
 		var scene := str(info["scene"])
 		if not thumbs.has(scene):
-			thumbs[scene] = load("res://art/mini/%s.jpg" % scene)
+			thumbs[scene] = Season.tex("res://art/mini/%s.jpg" % scene)
 		var view := Rect2(r.position.x + 12.0, r.position.y + 12.0, r.size.x - 24.0, 150.0)
 		var tex: Texture2D = thumbs[scene]
 		# The part of the painting that shows what the game is about.
@@ -485,7 +499,7 @@ func _draw() -> void:
 		draw_texture_rect_region(tex, view, Rect2(corner, cut))
 		draw_rect(view, Color(1.0, 1.0, 1.0, 0.9), false, 3.0)
 		_text(self, Vector2(r.position.x, r.position.y + 200.0), str(info["name"]), 25, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, r.size.x)
-		draw_multiline_string(font, Vector2(r.position.x + 14.0, r.position.y + 230.0), str(info["line"]), HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 28.0, 17, 2, Color(1.0, 0.97, 0.85))
+		draw_multiline_string(font, Vector2(r.position.x + 14.0, r.position.y + 230.0), str(info["winter"] if Season.festive() and info.has("winter") else info["line"]), HORIZONTAL_ALIGNMENT_CENTER, r.size.x - 28.0, 17, 2, Color(1.0, 0.97, 0.85))
 		for n in 3:
 			Ui.star(self, Vector2(r.get_center().x + (n - 1) * 34.0, r.end.y - 30.0), 13.0, n < best(str(info["id"])))
 

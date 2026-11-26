@@ -2,6 +2,7 @@ extends Control
 ## Hearts, the current objective, hints, short messages, the title screen and the
 ## "try again" banner. Everything sits along the top so it stays clear of the thumbs.
 
+const Season := preload("res://scripts/season.gd")
 const Ui := preload("res://scripts/ui.gd")
 
 var game = null
@@ -365,8 +366,8 @@ func _draw_sky(s: Vector2) -> void:
 
 func _draw_title(s: Vector2) -> void:
 	if title_art == null:
-		title_art = load("res://art/ui/title.jpg")
-		logo = load("res://art/ui/logo.png")
+		title_art = Season.tex("res://art/ui/title.jpg")
+		logo = Season.tex("res://art/ui/logo.png")
 	# The painting fills the screen, cut to fit, with its top kept in view.
 	var size := title_art.get_size()
 	# It drifts very slowly, as if the camera were breathing, and a few stars twinkle on it.
@@ -391,6 +392,15 @@ func _draw_title(s: Vector2) -> void:
 	var bob := sin(Time.get_ticks_msec() / 1000.0 * 1.4) * 4.0
 	var fall := (1.0 - Ui.pop((age - 0.1) / 0.6)) * -300.0  # the name drops in from above and settles
 	draw_texture_rect(logo, Rect2(s.x / 2.0 - wide / 2.0, 18.0 + bob + fall, wide, wide * logo.get_height() / logo.get_width()), false)
+	if Season.festive():
+		# Under the name: how long until Christmas, or the day's greeting.
+		var wish := Season.greeting()
+		var across := font.get_string_size(wish, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 26).x + 60.0
+		var grown := maxf(Ui.pop((age - 0.9) / 0.4), 0.001)
+		var ribbon := Rect2(s.x / 2.0 - across / 2.0, 30.0 + wide * logo.get_height() / logo.get_width(), across, 46.0)
+		draw_set_transform(ribbon.get_center() * (1.0 - grown), 0.0, Vector2(grown, grown))
+		Ui.button(self, font, ribbon, wish, 26, Color(0.78, 0.13, 0.15, 0.96), Color(1.0, 0.97, 0.85))
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 	var saved: bool = game.has_save()
 	for i in game.GAMES.size():

@@ -10,6 +10,7 @@ extends Node2D
 ## Nothing here can be lost: a knocked obstacle costs Spirit some of her speed, and the
 ## course ends with one to three stars.
 
+const Season := preload("res://scripts/season.gd")
 const HorseScript := preload("res://scripts/horse.gd")
 const Scenery := preload("res://scripts/scenery.gd")
 
@@ -385,7 +386,7 @@ func _build() -> void:
 		_add_crowds(plan)
 	# The finish is a gate to ride through, so it is drawn in two layers: the far post and
 	# the banner behind the horses, and the near post in front of them.
-	var gate: Texture2D = load("res://art/props/finish.png")
+	var gate: Texture2D = Season.tex("res://art/props/finish.png")
 	var size := gate.get_size()
 	var split := size.x * 0.8
 	for near in [false, true]:
@@ -496,7 +497,7 @@ func _add_crowds(plan: Array) -> void:
 		# Tallest at the back, so the rope and the little ones are not hidden.
 		for i in count:
 			var who := Sprite2D.new()
-			who.texture = load("res://art/props/crowd_%d.png" % rng.randi_range(0, CROWD_FACES - 1))
+			who.texture = Season.tex("res://art/props/crowd_%d.png" % rng.randi_range(0, CROWD_FACES - 1))
 			who.scale = Vector2(ART_SCALE, ART_SCALE) * 0.92
 			who.flip_h = rng.randf() < 0.4
 			who.offset = Vector2(0.0, -who.texture.get_size().y / 2.0)
@@ -763,7 +764,7 @@ func _add_jump_ring(x: float, height: float) -> void:
 
 func _sprite(art: String, x: float) -> Sprite2D:
 	var sprite := Sprite2D.new()
-	sprite.texture = load("res://art/props/%s.png" % art)
+	sprite.texture = Season.tex("res://art/props/%s.png" % art)
 	sprite.scale = Vector2(ART_SCALE, ART_SCALE)
 	sprite.offset = Vector2(0.0, -sprite.texture.get_size().y / 2.0)  # stands on its bottom edge
 	sprite.position = Vector2(x, ground_y(x) + 4.0)
@@ -793,7 +794,7 @@ func _add_obstacle(kind: String, x: float) -> void:
 	root.position = Vector2(x, ground_y(x))
 	root.rotation = atan(slope(x))
 	add_child(root)
-	var tex: Texture2D = load("res://art/props/%s.png" % kind)
+	var tex: Texture2D = Season.tex("res://art/props/%s.png" % kind)
 	var index := items.size()
 	var pieces: Array = []
 	match kind:
@@ -845,7 +846,7 @@ func _piece(root: Node2D, index: int, tex: Texture2D, region: Rect2, centre: Vec
 func _add_ring(x: float, y: float) -> void:
 	# The ring is drawn as two halves, one behind Spirit and one in front,
 	# so she really passes through it.
-	var tex: Texture2D = load("res://art/props/ring.png")
+	var tex: Texture2D = Season.tex("res://art/props/ring.png")
 	var size := tex.get_size()
 	var halves := []
 	for i in 2:

@@ -304,6 +304,69 @@ one more line in `LIST`. The numbers that set how hard each is are constants at 
 of its file. The pictures are cut from generated sheets by `art_src/build_mini.py` into
 `art/mini`.
 
+The rules they are held to, each checked by a scripted player that plays badly on purpose
+as well as one that plays well:
+
+- A game can always be finished, however it is played, and always gives at least one star.
+- Stars only ever go up: a worse go never takes away a better one. They are saved the
+  moment a game ends and are still there after the app is closed.
+- "Play again" starts clean, with nothing carried over from the go before.
+- Opening the menu, or the app losing the screen, lets go of whatever a finger was
+  holding, so nothing is left stuck to it.
+- A quick double tap in Merlin's potions counts once, not as a mistake.
+- In Lost lambs the result waits until every lamb that is coming home is through the
+  barn door, so the count on the panel is the true one.
+
+## Christmas
+
+From December 1 to January 1, by the tablet's own date, the whole game dresses for
+Christmas, and on January 2 it goes back as it was. Nothing has to be done to switch it.
+To see it at another time of year there is a row for it under Settings on the title
+screen: "Christmas: in December" (the normal way), "on now", or "off".
+
+What changes:
+
+- **Everywhere outdoors** it snows. The island, the riding course, the race, the sky
+  ride and the farm games are drawn in snow, with lights on the house, the stable and
+  Merlin's hut. The river is frozen and the frog has gone. The rings on the rides are
+  holly wreaths. Butterflies are snowflakes, the birds are robins, the rabbits are
+  snow hares, and a snowman stands where the lavender was.
+- **Everyone is dressed for it.** Adeline, her sister and the riders wear red bobble
+  hats, the goblins and the ogre wear elf hats, and Spirit, the pony and the unicorn wear
+  holly collars with a bell. There is no Santa in the game.
+- **The house** is hung with garlands in every room, and the stable too. In the living
+  room stand a Christmas tree, a nativity scene and a pile of presents.
+- **A present a day.** There is one present for each day of December up to the 25th. Tap
+  the pile to open the next: it bursts into stars and a light comes on in the tree. Days
+  that were missed can be opened one after another, so nobody loses out. The 25th lights
+  the star on top. This is kept with the adventure, and starts again each Christmas.
+- **Christmas dinner.** Dinner in the kitchen is turkey, mash, peas, a gingerbread
+  house, cookies and a Christmas pudding, with a candle on the table and cocoa for the
+  girls. Breakfast and lunch are as usual.
+- **The title screen** has its own picture, snow on the logo, and a ribbon that counts
+  the sleeps until Christmas, then says "It's Christmas Eve!", "Merry Christmas!",
+  "Happy New Year's Eve!" and "Happy New Year!" on those days. Every panel and button in
+  the game wears a cap of snow.
+- **Music and voices.** The island, the house, the rides and the farm games each have a
+  Christmas tune. The birdsong is silent. Merlin calls "Merry Christmas, Adeline!" when she
+  comes by, her sister calls it or "It's snowing!", and Adeline says it when she sits down
+  to dinner.
+
+How it is built: `scripts/season.gd` answers one question, `Season.festive()`, and
+everything asks it. Its dates are `FROM` and `UNTIL` at the top of the file. Every picture
+is loaded through `Season.tex(path)`, which gives the picture of the same name under
+`art/xmas` when it is Christmas and there is one, and the usual picture otherwise. So a
+winter picture is a stand-in of exactly the same size, and nothing else in the game needs
+to know. The hats and collars are put on the puppets by `Season.dress` (the table `WEAR`
+says who wears what, where). The snow is `scripts/snow.gd`, the tree and presents are
+`scripts/advent.gd`, and the snow caps are in `scripts/ui.gd`. The music is asked for as
+"x_" and the usual tune's name. The winter pictures are made by
+`art_src/build_xmas.py` from the drawings in `art_src/xmas` (run
+`python3 build_xmas.py xmas ../art` in `art_src`).
+
+To make another season later (say, autumn), the same three things are needed: dates in a
+script like `season.gd`, a folder of stand-in pictures, and anything extra to wear.
+
 ## At home
 
 Near the front door a "Go into the house" button appears, and near the stable a "Visit
@@ -453,6 +516,8 @@ How movement stays smooth
 - `scripts/mini.gd` is the frame the five farm games run in, and the list they are chosen
   from. Each game is its own file: `mini_apples.gd`, `mini_lambs.gd`, `mini_potions.gd`,
   `mini_hide.gd`, `mini_wash.gd`.
+- `scripts/season.gd` says whether it is Christmas and picks the winter pictures.
+  `scripts/snow.gd` is the falling snow, and `scripts/advent.gd` the tree and its presents.
 - `scripts/scenery.gd` is the sky, trees, flowers and animals. `scripts/ui.gd` is how panels
   and buttons are drawn. `scripts/sound.gd` plays every sound and the music.
 - `.github/workflows/build-apk.yml` builds the app.

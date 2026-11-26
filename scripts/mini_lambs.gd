@@ -6,6 +6,7 @@ extends Node2D
 ## round now and then. If it gets among the lambs they scatter; tap it and Adeline shoos
 ## it away.
 
+const Season := preload("res://scripts/season.gd")
 const Ui := preload("res://scripts/ui.gd")
 
 const DOOR := Vector2(268.0, 352.0)  # the barn's doorway
@@ -38,7 +39,7 @@ var gate := 0.0  # seconds until the next lamb may go in at the door
 
 func begin() -> void:
 	for name in ["lamb_stand", "lamb_walk_1", "lamb_walk_2", "lamb_jump", "lamb_sit", "lamb_sleep", "fox_1", "fox_2", "fox_scared"]:
-		art[name] = load("res://art/mini/%s.png" % name)
+		art[name] = Season.tex("res://art/mini/%s.png" % name)
 	who = host.girl("res://art/adeline", Vector2(430.0, 470.0), 2.05)
 	who["speed"] = 280.0
 	for i in STARTS.size():
@@ -161,7 +162,9 @@ func frame(delta: float) -> void:
 			if str(lamb["state"]) in ["lost", "follow", "stuck", "scared"]:
 				lamb["state"] = "home"
 				lamb["time"] = 0.0
-		if over > 2.6:
+		# Nobody is told "well done" while a lamb is still out in the field.
+		var indoors := lambs.all(func(l): return str(l["state"]) == "in" and float(l["time"]) > 0.4)
+		if (over > 2.6 and indoors) or over > 14.0:
 			var all_in := sun < DAY
 			var won := 1
 			if all_in:
@@ -221,7 +224,7 @@ func _lamb(lamb: Dictionary, delta: float, playing: bool, line: Array) -> void:
 				lamb["time"] = 0.0
 		"home":
 			want = DOOR
-			pace = 300.0
+			pace = 300.0 if over < 0.0 else 520.0  # at nightfall they run for the lantern
 			if at.distance_to(DOOR) < 10.0:
 				lamb["state"] = "in"
 				lamb["time"] = 0.0

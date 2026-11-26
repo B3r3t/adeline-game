@@ -10,6 +10,7 @@ extends Node2D
 ## as "m2_step": 0 fetch her sister, 1 take the boat, 2 the guards, 3 the gate, 4 the ogre,
 ## 5 open the cage.
 
+const Season := preload("res://scripts/season.gd")
 const LEFT := 5900.0  # the island's shore
 const RIGHT := 7650.0
 const LAND_X := 5990.0
@@ -79,7 +80,7 @@ func _ready() -> void:
 ## A picture standing on the ground line, centred on x. `sink` lowers it a little.
 func _prop(art: String, x: float, sink: float) -> Sprite2D:
 	var sprite := Sprite2D.new()
-	sprite.texture = load("res://art/props/%s.png" % art)
+	sprite.texture = Season.tex("res://art/props/%s.png" % art)
 	sprite.centered = false
 	sprite.scale = Vector2(game.ART_SCALE, game.ART_SCALE)
 	var size: Vector2 = sprite.texture.get_size() * game.ART_SCALE

@@ -3,6 +3,7 @@ extends RefCounted
 ## everywhere so the whole game feels like one thing.
 
 static var boxes := {}  # styles already made, by what they look like
+static var snowy := false  # at Christmas every panel and button has snow lying along its top
 
 
 static func _box(fill: Color, edge: Color, radius: float, border: float, shadow: float) -> StyleBoxFlat:
@@ -26,6 +27,30 @@ static func _box(fill: Color, edge: Color, radius: float, border: float, shadow:
 ## A dark panel with a golden edge, for messages and menus.
 static func panel(on: CanvasItem, r: Rect2, fill := Color(0.09, 0.11, 0.24, 0.9), edge := Color(1.0, 0.86, 0.45, 0.95), radius := 22.0) -> void:
 	on.draw_style_box(_box(fill, edge, minf(radius, r.size.y / 2.0), 3.0, 10.0), r)
+	if snowy and fill.a >= 0.5:
+		snow(on, r, minf(radius, r.size.y / 2.0))
+
+
+## Snow lying along the top of something: a soft white cap, with a few lumps where it has
+## settled thicker and one or two where it has slipped over the edge.
+static func snow(on: CanvasItem, r: Rect2, radius: float) -> void:
+	if r.size.y < 40.0 or r.size.x < 90.0:
+		return
+	var white := Color(0.97, 0.99, 1.0)
+	var shade := Color(0.78, 0.87, 0.97)
+	var left := r.position.x + radius * 0.7
+	var wide := r.size.x - radius * 1.4
+	on.draw_style_box(_box(shade, Color(0.0, 0.0, 0.0, 0.0), 7.0, 0.0, 0.0), Rect2(left, r.position.y - 4.0, wide, 13.0))
+	on.draw_style_box(_box(white, Color(0.0, 0.0, 0.0, 0.0), 7.0, 0.0, 0.0), Rect2(left, r.position.y - 7.0, wide, 12.0))
+	# The lumps are always in the same places on a thing of the same width, so they do not
+	# crawl about from frame to frame.
+	var lumps := int(clampf(wide / 60.0, 2.0, 9.0))
+	for i in lumps:
+		var x := left + wide * (i + 0.5 + 0.3 * sin(i * 12.9 + wide)) / lumps
+		var size := 7.0 + 4.0 * absf(sin(i * 7.3 + wide * 0.1))
+		on.draw_circle(Vector2(x, r.position.y - 4.0), size, white)
+		if i % 3 == 1:
+			on.draw_circle(Vector2(x + 9.0, r.position.y + 7.0), size * 0.55, white)
 
 
 ## A strip behind a line of text, with no edge.
@@ -43,6 +68,8 @@ static func button(on: CanvasItem, font: Font, r: Rect2, label: String, size: in
 		on.draw_style_box(_box(lip, Color(0.0, 0.0, 0.0, 0.0), radius, 0.0, 6.0), Rect2(r.position + Vector2(0.0, 5.0), r.size))
 		on.draw_style_box(_box(fill, Color(1.0, 1.0, 1.0, 0.6), radius, 2.0, 0.0), r)
 		on.draw_style_box(_box(Color(1.0, 1.0, 1.0, 0.15), Color(0.0, 0.0, 0.0, 0.0), radius * 0.75, 0.0, 0.0), Rect2(r.position + Vector2(5.0, 4.0), Vector2(r.size.x - 10.0, r.size.y * 0.42)))
+		if snowy:
+			snow(on, r, radius)
 	else:
 		on.draw_style_box(_box(fill, Color(1.0, 1.0, 1.0, 0.7), radius, 2.0, 0.0), r)
 	if label != "":

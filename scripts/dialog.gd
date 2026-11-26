@@ -3,6 +3,7 @@ extends Control
 ## Tap anywhere to move to the next line. In a list, tap a row to choose it,
 ## or tap outside the rows to close.
 
+const Season := preload("res://scripts/season.gd")
 const Ui := preload("res://scripts/ui.gd")
 # Whose picture goes beside the words, by the name they speak under.
 const FACES := { "Merlin": "merlin", "Little sister": "sister", "Mom": "mom", "Dad": "dad", "Adeline": "adeline" }
@@ -150,7 +151,7 @@ func _face(who: String) -> Texture2D:
 	if not FACES.has(who):
 		return null
 	if not faces.has(who):
-		faces[who] = load("res://art/ui/face_%s.png" % FACES[who])
+		faces[who] = Season.tex("res://art/ui/face_%s.png" % FACES[who])
 	return faces[who]
 
 

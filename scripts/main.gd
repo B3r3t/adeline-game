@@ -3,6 +3,8 @@ extends Node2D
 ## The home island is one long strip: Adeline's house and stable on the left,
 ## Merlin's hut, three goblin camps to the east, and the river with the boat at the far end.
 
+const Season := preload("res://scripts/season.gd")
+const Ui := preload("res://scripts/ui.gd")
 const PlayerScript := preload("res://scripts/player.gd")
 const GoblinScript := preload("res://scripts/goblin.gd")
 const HudScript := preload("res://scripts/hud.gd")
@@ -131,9 +133,14 @@ var new_game_armed := false
 var update_note := ""  # shown on the title screen
 var guard_cleared := false
 var clock := 0.0
+var merry := 4.0  # seconds until Merlin may call his Christmas greeting again
 
 
 func _ready() -> void:
+	# Whether it is Christmas has to be known before the first picture is loaded.
+	Season.mode = _saved_season()
+	Season.look()
+	Ui.snowy = Season.festive()
 	# A rounded, friendly typeface for every word in the game. Anything it lacks falls
 	# back to the engine's own.
 	var face: FontFile = load("res://art/ui/Fredoka-Medium.ttf")
@@ -223,9 +230,18 @@ func _ready() -> void:
 	mini.game = self
 	layer.add_child(mini)
 	layer.move_child(mini, hud.get_index())  # under the menu button and the speech box
+	# Snow, at Christmas, over the scene but under everything that is read or pressed.
+	var snow := Control.new()
+	snow.set_script(preload("res://scripts/snow.gd"))
+	snow.game = self
+	layer.add_child(snow)
+	layer.move_child(snow, hud.get_index())
+	for above in [hud, controls, dialog]:
+		above.z_index = 4050
 	var curtain := Control.new()
 	curtain.set_script(preload("res://scripts/curtain.gd"))
 	curtain.game = self
+	curtain.z_index = 4090
 	layer.add_child(curtain)
 
 	# Everything in the world stops when a menu is open. The menu itself, drawn by the
@@ -289,14 +305,14 @@ func _build_backdrop() -> void:
 	# Two layers of hills that slide past at different speeds for a feeling of depth.
 	hills_far = _add_strip("hills_far", 230.0, GROUND_Y + 24.0, -20)
 	hills_near = _add_strip("hills_near", 270.0, GROUND_Y + 14.0, -10)
-	ground_art = load("res://art/props/ground.png")
+	ground_art = Season.tex("res://art/props/ground.png")
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 
 
 ## A long picture that repeats sideways, standing on the given line.
 func _add_strip(art: String, world_height: float, bottom_y: float, depth: int) -> Sprite2D:
 	var sprite := Sprite2D.new()
-	var tex: Texture2D = load("res://art/props/%s.png" % art)
+	var tex: Texture2D = Season.tex("res://art/props/%s.png" % art)
 	sprite.texture = tex
 	sprite.centered = false
 	sprite.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
@@ -332,7 +348,7 @@ func _build_scenery() -> void:
 
 func _add_scenery(art: String, x: float, centred: bool) -> Sprite2D:
 	var sprite := Sprite2D.new()
-	sprite.texture = load("res://art/props/%s.png" % art)
+	sprite.texture = Season.tex("res://art/props/%s.png" % art)
 	sprite.centered = false
 	sprite.scale = Vector2(ART_SCALE, ART_SCALE)
 	var size := sprite.texture.get_size() * ART_SCALE
@@ -411,7 +427,7 @@ func _add_wall(rect: Rect2) -> void:
 # --- Saved progress ---------------------------------------------------------
 
 func _default_data() -> Dictionary:
-	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "hair": 0, "m2": "available", "m2_step": 0, "m2_thanked": false, "m3": "available", "m3_step": 0, "m3_clues": 0, "m3_thanked": false, "mount": "spirit", "sky_course": 1, "sky_stars": {}, "mini_stars": {} }
+	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "hair": 0, "m2": "available", "m2_step": 0, "m2_thanked": false, "m3": "available", "m3_step": 0, "m3_clues": 0, "m3_thanked": false, "mount": "spirit", "sky_course": 1, "sky_stars": {}, "mini_stars": {}, "advent": { "year": 0, "days": [] } }
 
 
 func has_save() -> bool:
@@ -460,7 +476,16 @@ func _load_settings() -> void:
 func _save_settings() -> void:
 	var file := FileAccess.open(SETTINGS_PATH, FileAccess.WRITE)
 	if file != null:
-		file.store_string(JSON.stringify({ "sound": sound_on, "music": music_on, "buttons": button_size, "easy": easy_fights }))
+		file.store_string(JSON.stringify({ "sound": sound_on, "music": music_on, "buttons": button_size, "easy": easy_fights, "season": Season.mode }))
+
+
+## Whether the settings say Christmas is "on", "off" or left to the calendar ("auto").
+func _saved_season() -> String:
+	if FileAccess.file_exists(SETTINGS_PATH):
+		var settings = JSON.parse_string(FileAccess.get_file_as_string(SETTINGS_PATH))
+		if settings is Dictionary and str(settings.get("season", "auto")) in ["auto", "on", "off"]:
+			return str(settings.get("season", "auto"))
+	return "auto"
 
 
 ## How much bigger or smaller than usual the thumb buttons are drawn.
@@ -1169,6 +1194,7 @@ func open_menu(which: String) -> void:
 	menu = which
 	new_game_armed = false
 	controls.release_all()
+	mini.let_go()
 	get_tree().paused = true
 	sound.play("pop", -8.0)
 
@@ -1193,6 +1219,7 @@ func menu_rows() -> Array:
 			rows.append(["games", "Back to the farm games"])
 		rows.append(["home", "Go to the title screen"])
 	else:
+		rows.append(["season", "Christmas: %s" % { "auto": "in December", "on": "on now", "off": "off" }[Season.mode]])
 		if has_save():
 			rows.append(["new", "Tap again to erase everything" if new_game_armed else "Start a new adventure"])
 		rows.append(["resume", "Done"])
@@ -1235,6 +1262,15 @@ func _tap_menu(pos: Vector2) -> void:
 			controls._layout()
 		"fights":
 			easy_fights = not easy_fights
+		"season":
+			# In December by the calendar, on now, or off. The whole game is dressed again,
+			# so it starts over from the title screen.
+			Season.mode = { "auto": "on", "on": "off", "off": "auto" }[Season.mode]
+			_save_settings()
+			if get_tree().current_scene == self:
+				get_tree().paused = false
+				get_tree().reload_current_scene()
+				return
 		"home":
 			close_menu()
 			go_title()
@@ -1553,6 +1589,12 @@ func _set_the_mood() -> void:
 			if mini.which >= 0 and str(mini.LIST[mini.which]["scene"]) == "hut":
 				tune = "cozy"
 				air = ""
+	if Season.festive():
+		# Christmas has tunes of its own, and the birds have flown south.
+		if sound.tunes.has("x_" + tune):
+			tune = "x_" + tune
+		if air == "birds":
+			air = ""
 	sound.want(tune, air)
 
 
@@ -1585,6 +1627,11 @@ func _process(delta: float) -> void:
 	goblins = goblins.filter(func(g): return is_instance_valid(g))
 	# Merlin turns to face Adeline. A goblin camp packs up once its goblins are beaten.
 	merlin.flip_h = player.position.x < MERLIN_X
+	# At Christmas he calls a greeting when Adeline comes by.
+	merry = maxf(merry - delta, 0.0)
+	if Season.festive() and merry <= 0.0 and mode == "play" and not dialog.active and absf(player.position.x - MERLIN_X) < 230.0:
+		merry = 90.0
+		sound.shout("merlin", "merlin_merry", 1.0)
 	# He breathes, so he does not look like a cardboard cutout.
 	var breath := 1.0 + sin(clock * 1.8) * 0.012
 	merlin.scale.y = ART_SCALE * breath
@@ -1636,5 +1683,10 @@ func _draw_merlin_mark(g: float) -> void:
 
 
 func _draw_river(g: float) -> void:
+	if Season.festive():
+		# Frozen over: pale ice with a white rim.
+		draw_rect(Rect2(RIVER_X, g + 6.0, 800.0, 600.0), Color(0.62, 0.8, 0.93))
+		draw_rect(Rect2(RIVER_X, g + 6.0, 800.0, 12.0), Color(0.93, 0.97, 1.0))
+		return
 	draw_rect(Rect2(RIVER_X, g + 6.0, 800.0, 600.0), Color(0.25, 0.55, 0.85))
 	draw_rect(Rect2(RIVER_X, g + 6.0, 800.0, 10.0), Color(0.6, 0.82, 0.98))

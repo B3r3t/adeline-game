@@ -10,6 +10,7 @@ extends Node2D
 ## out of the bottom of the sky, she tumbles back down to earth and lands in the hay.
 ## Then she gallops, takes off and comes back up at the last rainbow arch she reached.
 
+const Season := preload("res://scripts/season.gd")
 const START_X := 9000.0  # the meadow she takes off from, and comes back down to
 const HAY_X := 9340.0
 const SKY_HEIGHT := 3200.0  # how far above the ground the middle of the sky ride is
@@ -74,7 +75,7 @@ func _ready() -> void:
 	back_layer.layer = -10
 	add_child(back_layer)
 	backdrop = Sprite2D.new()
-	backdrop.texture = load("res://art/sky/back.jpg")
+	backdrop.texture = Season.tex("res://art/sky/back.jpg")
 	backdrop.visible = false
 	back_layer.add_child(backdrop)
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
@@ -134,7 +135,7 @@ func title() -> String:
 # The same number always gives the same sky, so it can be practised.
 
 func _art(name: String) -> Texture2D:
-	return load("res://art/sky/%s.png" % name)
+	return Season.tex("res://art/sky/%s.png" % name)
 
 
 ## A picture from the sky drawings, at its proper size, centred on a spot.

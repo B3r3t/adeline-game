@@ -372,6 +372,9 @@ MUSIC = {
     "home": ("home.mp3", 0.0, 0.0, 3.0, -20), "fight": ("fight.mp3", 0.0, 0.0, 3.0, -20), "ride": ("ride.mp3", 15.0, 0.0, 3.0, -20),
     "sky": ("sky.mp3", 0.0, 0.0, 3.0, -20), "cozy": ("cozy.mp3", 0.0, 0.0, 3.0, -20),
     "play": ("play.mp3", 0.0, 0.0, 3.0, -20),
+    # Christmas (December 1 to January 1): the game asks for "x_" + the usual name.
+    "x_home": ("x_home.mp3", 0.0, 0.0, 3.0, -20), "x_cozy": ("x_cozy.mp3", 0.0, 0.0, 3.0, -20),
+    "x_play": ("x_play.mp3", 0.0, 0.0, 3.0, -20), "x_ride": ("x_ride.mp3", 0.0, 0.0, 3.0, -20),
 }
 AMBIENCE = {"birds": ("birds.mp3", 0.3, 12.5, 2.0, -30), "wind": ("wind.mp3", 0.3, 0.0, 2.5, -30)}
 
@@ -485,6 +488,8 @@ ADELINE = {
     "shoo": ["a_shoo"],
     "ready_or_not": ["a_ready"],
     "found_you": ["a_found"],
+    "merry": ["a_merry"],
+    "present": ["a_present"],
     "not_here": ["a_not_here"],
     "bath_time": ["a_bath"],
     "my_turn": ["a_my_turn"],
@@ -509,6 +514,7 @@ SISTER = {
     "sister_hide": ["s_hide"],
     "sister_found": ["s_found"],
     "sister_giggle": ["s_giggle"],
+    "sister_merry": ["s_merry", "s_snowing"],
     "sister_splash": ["s_splash"],
     "sister_sparkly": ["s_sparkly"],
     "sister_muddy": ["s_muddy"],
@@ -519,6 +525,7 @@ MERLIN_CALLS = {
     "merlin_turn": ["m_turn"],
     "merlin_splendid": ["m_splendid", "m_perfect"],
     "merlin_oops": ["m_oops"],
+    "merlin_merry": ["m_merry"],
 }
 # Animals in the farm games: name in the game -> recordings.
 ANIMALS = {

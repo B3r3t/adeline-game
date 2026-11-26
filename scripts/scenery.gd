@@ -6,6 +6,7 @@ extends Node2D
 ## None of it can be bumped into and none of it is saved. It is laid out the same way every
 ## time, from a fixed set of dice, so the island is always the same island.
 
+const Season := preload("res://scripts/season.gd")
 const FIXED := [
 	# what, where, how big, and which side of the characters: -2 far behind, -1 behind, 3 in front
 	["oak", -150.0, 1.0, -2], ["lamp", 664.0, 1.0, -1], ["apple_tree", 790.0, 0.9, -2], ["barrel", 706.0, 1.0, -1],
@@ -46,7 +47,7 @@ static func stand(name: String, where: Vector2, size := 1.0) -> Sprite2D:
 	if sizes.is_empty():
 		sizes = JSON.parse_string(FileAccess.get_file_as_string("res://art/nature/sizes.json"))
 	var sprite := Sprite2D.new()
-	sprite.texture = load("res://art/nature/%s.png" % name)
+	sprite.texture = Season.tex("res://art/nature/%s.png" % name)
 	var k: float = float(sizes[name]) / sprite.texture.get_height() * size
 	sprite.scale = Vector2(k, k)
 	sprite.offset = Vector2(0.0, -sprite.texture.get_height() / 2.0)
@@ -72,6 +73,11 @@ func _build_sky() -> void:
 	blue.set_color(0, Color(0.33, 0.62, 0.95))
 	blue.set_color(1, Color(0.72, 0.9, 0.98))
 	blue.add_point(0.55, Color(0.55, 0.82, 0.95))
+	if Season.festive():
+		# A winter afternoon: a deeper blue above, warming to pale gold over the hills.
+		blue.set_color(0, Color(0.26, 0.44, 0.82))
+		blue.set_color(1, Color(0.62, 0.76, 0.95))
+		blue.set_color(2, Color(0.99, 0.9, 0.82))
 	var tex := GradientTexture2D.new()
 	tex.gradient = blue
 	tex.width = 8
@@ -90,7 +96,7 @@ func _build_sky() -> void:
 	dice.seed = 41
 	for i in 5:
 		var cloud := Sprite2D.new()
-		cloud.texture = load("res://art/sky/cloud_%d.png" % (i % 3))
+		cloud.texture = Season.tex("res://art/sky/cloud_%d.png" % (i % 3))
 		cloud.modulate = Color(1.0, 1.0, 1.0, 0.8)
 		sky_layer.add_child(cloud)
 		clouds.append([cloud, (i + dice.randf()) / 5.0, dice.randf_range(0.16, 0.4), dice.randf_range(0.004, 0.011), dice.randf_range(0.4, 0.7)])
@@ -176,6 +182,11 @@ func _build_river() -> void:
 	frog.z_index = 3
 	frog.flip_h = true
 	add_child(frog)
+	if Season.festive():
+		# The river is frozen: no lily pads, and the frog is asleep in the mud till spring.
+		frog.visible = false
+		for entry in lilies:
+			entry[0].visible = false
 
 
 # --- Animals --------------------------------------------------------------------------------
@@ -186,7 +197,7 @@ func _build_animals() -> void:
 	for i in mini(7, flowers.size()):
 		var home: Vector2 = flowers[(i * 3) % flowers.size()]
 		var node := Sprite2D.new()
-		node.texture = load("res://art/nature/butterfly_a.png")
+		node.texture = Season.tex("res://art/nature/butterfly_a.png")
 		node.z_index = 3
 		node.modulate = Color.from_hsv(dice.randf(), 0.25, 1.0)
 		add_child(node)
@@ -199,8 +210,8 @@ func _build_animals() -> void:
 
 
 func _animals_frame(delta: float) -> void:
-	var a_tex: Texture2D = load("res://art/nature/butterfly_a.png")
-	var b_tex: Texture2D = load("res://art/nature/butterfly_b.png")
+	var a_tex: Texture2D = Season.tex("res://art/nature/butterfly_a.png")
+	var b_tex: Texture2D = Season.tex("res://art/nature/butterfly_b.png")
 	for b in butterflies:
 		var node: Sprite2D = b["node"]
 		var t: float = clock * float(b["pace"]) + float(b["phase"])
@@ -239,7 +250,7 @@ func _animals_frame(delta: float) -> void:
 				if int(r["hops"]) == 0:
 					r["rest"] = 1.2
 		var hopping := int(r["hops"]) > 0
-		node.texture = load("res://art/nature/rabbit_b.png" if hopping else "res://art/nature/rabbit_a.png")
+		node.texture = Season.tex("res://art/nature/rabbit_b.png" if hopping else "res://art/nature/rabbit_a.png")
 		var k: float = float(sizes["rabbit_b" if hopping else "rabbit_a"]) / node.texture.get_height()
 		node.scale = Vector2(k, k * (1.0 if hopping else 1.0 + sin(clock * 9.0 + float(r["home"])) * 0.03))
 		node.offset = Vector2(0.0, -node.texture.get_height() / 2.0)
@@ -260,7 +271,7 @@ func _animals_frame(delta: float) -> void:
 		b["x"] = float(b["x"]) + float(b["way"]) * float(b["pace"]) * delta
 		var t := clock * 9.0 + float(b["phase"])
 		var up := sin(t) > 0.0
-		node.texture = load("res://art/nature/bird_a.png" if up else "res://art/nature/bird_b.png")
+		node.texture = Season.tex("res://art/nature/bird_a.png" if up else "res://art/nature/bird_b.png")
 		var k: float = float(sizes["bird_a" if up else "bird_b"]) / node.texture.get_height()
 		node.scale = Vector2(k, k)
 		node.flip_h = float(b["way"]) < 0.0
@@ -294,12 +305,13 @@ func _draw() -> void:
 	var g: float = game.GROUND_Y
 	# The river: bands of lighter water that slide along, and glints of sun.
 	var from: float = game.RIVER_X
+	var flow := 0.0 if Season.festive() else clock  # frozen in winter: the lines are cracks in the ice
 	for row in 5:
 		var y := g + 22.0 + row * 34.0
 		var points := PackedVector2Array()
 		for i in 41:
 			var x := from + i * 20.0
-			points.append(Vector2(x, y + sin(x * 0.03 + clock * (1.4 + row * 0.3) + row) * 3.5))
+			points.append(Vector2(x, y + sin(x * 0.03 + flow * (1.4 + row * 0.3) + row) * 3.5))
 		draw_polyline(points, Color(0.75, 0.9, 1.0, 0.5 - row * 0.07), 4.0 - row * 0.5)
 	for i in 9:
 		var t := fposmod(clock * 0.35 + i * 0.37, 1.0)

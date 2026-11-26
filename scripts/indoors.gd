@@ -13,9 +13,11 @@ extends Control
 ## Everything is placed in the units of the background picture (1344 x 752), and the whole
 ## room is scaled to fill whatever screen it is on.
 
+const Season := preload("res://scripts/season.gd")
 const RigScript := preload("res://scripts/rig.gd")
 const PlaymateScript := preload("res://scripts/playmate.gd")
 const KitchenScript := preload("res://scripts/kitchen.gd")
+const AdventScript := preload("res://scripts/advent.gd")
 const Moves := preload("res://scripts/moves.gd")
 const HorseScript := preload("res://scripts/horse.gd")
 const Ui := preload("res://scripts/ui.gd")
@@ -90,6 +92,7 @@ var note_time := 0.0
 var adeline = null
 var playmate = null  # her little sister, when she is in the house
 var kitchen = null  # the family at their cooking and their dinner
+var advent = null  # the Christmas tree and its presents
 var at := Vector2.ZERO  # where her feet are
 var goal := Vector2.ZERO
 var facing := 1
@@ -153,6 +156,11 @@ func _ready() -> void:
 	kitchen.inn = self
 	kitchen.game = game
 	add_child(kitchen)
+	advent = Node.new()
+	advent.set_script(AdventScript)
+	advent.inn = self
+	advent.game = game
+	add_child(advent)
 	if FileAccess.file_exists(SAVE_PATH):
 		var saved = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 		if saved is Dictionary:
@@ -194,7 +202,7 @@ func _care() -> Dictionary:
 func _tex(name: String) -> Texture2D:
 	if not textures.has(name):
 		var ext := "jpg" if name in ["room", "stable", "bedroom", "bathroom", "kitchen", "mouth", "plaque"] else "png"
-		textures[name] = load("res://art/room/%s.%s" % [name, ext])
+		textures[name] = Season.tex("res://art/room/%s.%s" % [name, ext])
 	return textures[name]
 
 
@@ -276,6 +284,7 @@ func close() -> void:
 	visible = false
 	playmate.closed()
 	kitchen.closed()
+	advent.closed()
 
 
 func _layout() -> void:
@@ -343,6 +352,7 @@ func _enter_room(which: String) -> void:
 	next_id = 1
 	playmate.entered_room()
 	kitchen.entered_room()
+	advent.entered_room()
 	if which == "bathroom":
 		_open_bathroom()
 		return
@@ -1147,6 +1157,7 @@ func _process(delta: float) -> void:
 	if place == "house":
 		playmate.frame(delta)
 		kitchen.frame(delta)
+		advent.frame(delta)
 	overlay.queue_redraw()
 
 
@@ -1476,9 +1487,10 @@ func _draw_house(s: Vector2) -> void:
 		return
 	if playmate.play != "":
 		return  # a game with her sister is on: the room's own hints and buttons wait
-	if things.is_empty():
+	advent.draw_ui(s)
+	if things.is_empty() and note_time <= 0.0:
 		_text(Vector2(0.0, 216.0), "Tap something below to put it in the room.", 26, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
-	elif selected < 0 and clock < 7.0:
+	elif selected < 0 and clock < 7.0 and note_time <= 0.0:
 		_text(Vector2(0.0, 216.0), "Drag things to move them. Small things can sit on the furniture. Tap the floor and Adeline walks there.", 21, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)
 	if selected < 0 or selected >= things.size():
 		return

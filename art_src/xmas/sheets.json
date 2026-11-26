@@ -1,0 +1,84 @@
+{
+ "props": {
+  "cols": 4,
+  "rows": 3,
+  "files": [
+   "props/camp.png",
+   "props/fort_arch.png",
+   "props/sign.png",
+   "props/finish.png",
+   "props/boat.png",
+   "props/fence.png",
+   "props/bale.png",
+   "props/ring.png",
+   "props/log.png",
+   "props/fort_door.png",
+   "props/cage.png",
+   "sky/hay.png"
+  ]
+ },
+ "nature1": {
+  "cols": 4,
+  "rows": 2,
+  "files": [
+   "nature/oak.png",
+   "nature/pine.png",
+   "nature/apple_tree.png",
+   "nature/well.png",
+   "nature/scarecrow.png",
+   "nature/cart.png",
+   "nature/lamp.png",
+   "nature/birdhouse.png"
+  ]
+ },
+ "nature2": {
+  "cols": 4,
+  "rows": 2,
+  "files": [
+   "nature/barrel.png",
+   "nature/boulder.png",
+   "nature/stump.png",
+   "nature/bush.png",
+   "nature/fence.png",
+   "nature/dock.png",
+   "nature/blossom.png",
+   "nature/sunflowers.png"
+  ]
+ },
+ "people": {
+  "cols": 4,
+  "rows": 1,
+  "files": [
+   "props/merlin.png",
+   "props/mum.png",
+   "props/dad.png",
+   "props/crowd_4.png"
+  ]
+ },
+ "skyset": {
+  "cols": 3,
+  "rows": 2,
+  "files": [
+   "sky/castle.png",
+   "sky/arch.png",
+   "sky/ring.png",
+   "sky/pillar_cloud.png",
+   "sky/pillar_storm.png",
+   "sky/storm.png"
+  ]
+ },
+ "hiding": {
+  "cols": 4,
+  "rows": 2,
+  "files": [
+   "mini/bales.png",
+   "mini/barrel.png",
+   "mini/bush.png",
+   "mini/barrow.png",
+   "mini/well.png",
+   "mini/sheet.png",
+   "mini/kennel.png",
+   "mini/crates.png"
+  ]
+ }
+}

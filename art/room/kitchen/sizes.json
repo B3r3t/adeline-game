@@ -28,5 +28,13 @@
  "toast": 72.0,
  "jam": 70.0,
  "vase": 62.0,
- "salt": 50.0
+ "salt": 50.0,
+ "turkey": 132.0,
+ "pudding": 92.0,
+ "gingerbread": 100.0,
+ "cookies": 104.0,
+ "cocoa": 38.0,
+ "yule_log": 104.0,
+ "candle": 78.0,
+ "oranges": 86.0
 }

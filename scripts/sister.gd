@@ -5,6 +5,7 @@ extends Node2D
 ## She and her pony have drawings of their own: a five-year-old with a big head and short
 ## legs, and a round, shaggy pony. Neither is a bigger character made small.
 
+const Season := preload("res://scripts/season.gd")
 const RigScript := preload("res://scripts/rig.gd")
 const Moves := preload("res://scripts/moves.gd")
 const HorseScript := preload("res://scripts/horse.gd")
@@ -163,7 +164,7 @@ func _physics_process(delta: float) -> void:
 	if mode == "roam" and game.mode == "play" and hello <= 0.0 and absf(game.player.position.x - x) < 190.0 and not game.dialog.active:
 		hello = 28.0
 		hop = 0.6
-		game.sound.shout("sister", "sister_hello", 1.0, true)
+		game.sound.shout("sister", "sister_merry" if Season.festive() and randf() < 0.6 else "sister_hello", 1.0, true)
 
 	_show(delta)
 
@@ -253,7 +254,7 @@ static func wear_hair(on, n: int) -> void:
 		hair_specs = JSON.parse_string(FileAccess.get_file_as_string("res://art/sister/hair.json"))
 	var style: String = HAIR[posmod(n, HAIR.size())]
 	var spec: Dictionary = hair_specs[style]
-	on.swap("ponytail", load("res://art/sister/hair_%s.png" % style), Vector2(spec["pivot"][0], spec["pivot"][1]), Vector2(spec["pos"][0], spec["pos"][1]), float(spec["soft"]))
+	on.swap("ponytail", Season.tex("res://art/sister/hair_%s.png" % style), Vector2(spec["pivot"][0], spec["pivot"][1]), Vector2(spec["pos"][0], spec["pos"][1]), float(spec["soft"]))
 
 
 func set_hair(n: int) -> void:

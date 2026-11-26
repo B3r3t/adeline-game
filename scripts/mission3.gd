@@ -10,6 +10,7 @@ extends Node2D
 ## (how many of the three sets of hoofprints have been found is "m3_clues"), 2 the trappers,
 ## 3 free the unicorn, 4 fly her home. The flight home is the sky ride (sky.gd).
 
+const Season := preload("res://scripts/season.gd")
 const RigScript := preload("res://scripts/rig.gd")
 const HorseScript := preload("res://scripts/horse.gd")
 const Moves := preload("res://scripts/moves.gd")
@@ -46,7 +47,7 @@ func _ready() -> void:
 	unicorn.tint("wing_far", Color(0.8, 0.8, 0.9))
 	unicorn.scale = Vector2(-1.0, 1.0)  # she looks back west, the way help will come from
 	net = Sprite2D.new()
-	net.texture = load("res://art/props/net.png")
+	net.texture = Season.tex("res://art/props/net.png")
 	net.scale = Vector2(game.ART_SCALE, game.ART_SCALE) * 1.12
 	net.offset = Vector2(0.0, -net.texture.get_height() / 2.0)
 	net.position = Vector2(NET_X + 6.0, game.GROUND_Y + 8.0)
