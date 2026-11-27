@@ -117,6 +117,41 @@ in the stable (each has her own food, shine and love).
 keeps her up and the camera goes up with her. From her little sister's menu, "Fly on Aurora
 with me!" has her climb up in front whenever Adeline mounts.
 
+## Mission 4: The Littlest Hero
+
+The mission where the little sister saves the day, and is the one who is played. It is on
+Merlin's list once the goblins of Mission 1 are beaten.
+
+The goblins have dug a burrow under the hill and carried off Merlin's spell book. Adeline
+rides off to fetch it, and a net falls on her and on Spirit. The tunnel is too small for
+Merlin and for a horse, but not for a small girl. There is no fighting in it at all.
+
+- **The tunnel.** Her pony waits at the mouth. Three goblin sentries doze along the tunnel,
+  each with a lantern. Every so often one wakes: he yawns (the warning), then lifts his
+  lantern and looks, and the stretch of path in front of him is lit. Between the stretches
+  are things to hide behind. Hold a finger where she should tiptoe: wait behind something,
+  and cross when the goblin is asleep. If she is in the light when he looks he shouts, and
+  she scampers back behind the last thing she passed. The sentries get quicker along the way.
+- **The den.** The chief is asleep in his armchair with the key on his belt, Adeline is in
+  a cage and Spirit is tied up beside it. The key has to be lifted off him and carried to
+  the padlock, slowly: carrying it fast makes a noise, shown on a bar. When the bar fills,
+  or when he has one of his restless turns, he stirs, and the key must be held quite still
+  until he settles. If it moves he wakes, she ducks down, and the key is back on his belt
+  when he nods off. Letting go drops it with a clatter, to be picked up where it fell.
+- When the cage opens, Adeline's wand sends the chief diving behind his chair and her
+  sister picks up the spell book. Home again, Merlin gives six stars for the purse.
+
+Nobody can be hurt and nothing can be lost in either part but a little ground or a little
+time, so a small child can finish it. Leaving half way (the menu has "Back to the island")
+keeps the place: Merlin sends her back to the part she had reached.
+
+How it is built: the two parts are played on painted scenes in the frame the farm games
+use. `STORY` in `scripts/mini.gd` lists them, `scripts/mini_sneak.gd` is the tunnel and
+`scripts/mini_key.gd` the den; the numbers that set how hard each is are at the top of
+its file (`SENTRIES`, `QUIET`, `STIR`). `scripts/mission4.gd` is the story round them:
+what is said before, between and after, and what is saved (`m4`, `m4_part`). The pictures
+are made by `art_src/build_m4.py`.
+
 ## The sky ride
 
 "Fly the unicorn" on the title screen, and the last step of Mission 3. It is a third way to
@@ -572,7 +607,8 @@ How movement stays smooth
 - `scripts/hud.gd` is the hearts, objective, hints and title screen.
 - `scripts/dialog.gd` is the dialogue box and Merlin's mission list.
 - `scripts/horse.gd` is Spirit, and the unicorn, the pony and the race horses.
-- `scripts/mission2.gd` and `scripts/mission3.gd` are the two later missions.
+- `scripts/mission2.gd` and `scripts/mission3.gd` are the two later missions on the island.
+  `scripts/mission4.gd` is the fourth, whose two parts are `mini_sneak.gd` and `mini_key.gd`.
 - `scripts/sky.gd` is the sky ride. `scripts/ride.gd` is the riding course and the race.
 - `scripts/curtain.gd` opens each new place out of the dark.
 - `scripts/mini.gd` is the frame the five farm games run in, and the list they are chosen

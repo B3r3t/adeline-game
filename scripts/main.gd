@@ -19,6 +19,7 @@ const Mission2Script := preload("res://scripts/mission2.gd")
 const Mission3Script := preload("res://scripts/mission3.gd")
 const SkyScript := preload("res://scripts/sky.gd")
 const MiniScript := preload("res://scripts/mini.gd")
+const Mission4Script := preload("res://scripts/mission4.gd")
 const ShopScript := preload("res://scripts/shop.gd")
 const Look := preload("res://scripts/look.gd")
 const SceneryScript := preload("res://scripts/scenery.gd")
@@ -99,6 +100,7 @@ var sound_on := true
 var indoors = null  # the living room and the stable
 var mini = null  # the farm games
 var shop = null  # Merlin's shop
+var mission4 = null  # the mission where the little sister is the hero
 var place_action := ""  # a building Adeline is standing at: house or stable
 var zoom := CAMERA_ZOOM
 var merlin: Sprite2D
@@ -237,6 +239,10 @@ func _ready() -> void:
 	shop.set_script(ShopScript)
 	shop.game = self
 	layer.add_child(shop)
+	mission4 = Node.new()
+	mission4.set_script(Mission4Script)
+	mission4.game = self
+	add_child(mission4)
 	layer.move_child(mini, hud.get_index())  # under the menu button and the speech box
 	# Snow, at Christmas, over the scene but under everything that is read or pressed.
 	var snow := Control.new()
@@ -435,7 +441,7 @@ func _add_wall(rect: Rect2) -> void:
 # --- Saved progress ---------------------------------------------------------
 
 func _default_data() -> Dictionary:
-	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "hair": 0, "m2": "available", "m2_step": 0, "m2_thanked": false, "m3": "available", "m3_step": 0, "m3_clues": 0, "m3_thanked": false, "mount": "spirit", "sky_course": 1, "sky_stars": {}, "mini_stars": {}, "advent": { "year": 0, "days": [] }, "purse": -1, "owned": [], "foal": { "name": "", "days": 0, "seen": 0, "last": 0, "day": 0, "milk": 0.0, "brush": 0.0, "love": 0.0 }, "look": { "cloak": "purple", "blanket": "purple", "hat": "", "neck": "" } }
+	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "hair": 0, "m2": "available", "m2_step": 0, "m2_thanked": false, "m3": "available", "m3_step": 0, "m3_clues": 0, "m3_thanked": false, "m4": "available", "m4_part": 0, "mount": "spirit", "sky_course": 1, "sky_stars": {}, "mini_stars": {}, "advent": { "year": 0, "days": [] }, "purse": -1, "owned": [], "foal": { "name": "", "days": 0, "seen": 0, "last": 0, "day": 0, "milk": 0.0, "brush": 0.0, "love": 0.0 }, "look": { "cloak": "purple", "blanket": "purple", "hat": "", "neck": "" } }
 
 
 func has_save() -> bool:
@@ -1028,6 +1034,7 @@ func _show_missions() -> void:
 	if m1 == "done":
 		var n := int(data["practice_round"])
 		rows.append({ "id": "practice", "label": "Practice fight: %d goblin%s" % [n, "" if n == 1 else "s"], "status": "Ready", "enabled": true })
+	rows.insert(3, mission4.row())
 	rows.append({ "id": "shop", "label": "Merlin's shop", "status": "%d stars to spend" % int(data["purse"]), "enabled": true })
 	dialog.choose("Merlin's missions", rows, _on_mission_picked)
 
@@ -1035,6 +1042,8 @@ func _show_missions() -> void:
 func _on_mission_picked(id: String) -> void:
 	if id == "shop":
 		shop.open()
+	elif id == "m4":
+		mission4.picked()
 	elif id == "m1":
 		data["m1"] = "active"
 		_update_limits()
@@ -1107,7 +1116,9 @@ func objective() -> String:
 		return mission2.objective()
 	if data["m3"] == "active":
 		return mission3.objective()
-	if data["m2"] == "available" or data["m3"] == "available":
+	if data["m4"] == "active":
+		return "Merlin knows the way to the burrow"
+	if data["m2"] == "available" or data["m3"] == "available" or data["m4"] == "available":
 		return "Talk to Merlin"
 	return "All missions complete"
 
@@ -1255,7 +1266,7 @@ func menu_rows() -> Array:
 	rows.append(["fights", "Goblin fights: easy" if easy_fights else "Goblin fights: normal"])
 	if menu == "pause":
 		if mode == "mini":
-			rows.append(["games", "Back to the farm games"])
+			rows.append(["games", "Back to the island" if mini.story >= 0 else "Back to the farm games"])
 		rows.append(["home", "Go to the title screen"])
 	else:
 		rows.append(["season", "Christmas: %s" % { "auto": "in December", "on": "on now", "off": "off" }[Season.mode]])
@@ -1315,7 +1326,10 @@ func _tap_menu(pos: Vector2) -> void:
 			go_title()
 		"games":
 			close_menu()
-			mini.open_list()
+			if mini.story >= 0:
+				mission4.leave()
+			else:
+				mini.open_list()
 		"new":
 			if new_game_armed:
 				close_menu()
@@ -1631,8 +1645,11 @@ func _set_the_mood() -> void:
 			air = ""
 		"games", "mini":
 			tune = "play"
-			if mini.which >= 0 and str(mini.LIST[mini.which]["scene"]) == "hut":
+			if mini.scene() == "hut":
 				tune = "cozy"
+				air = ""
+			elif mini.story >= 0:
+				tune = "sneak"  # creeping about under the hill
 				air = ""
 	if Season.festive():
 		# Christmas has tunes of its own, and the birds have flown south.

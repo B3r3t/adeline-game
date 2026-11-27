@@ -19,7 +19,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if game == null or game.indoors == null:
 		return
-	var now := "%s %s %s %d" % [game.mode, game.indoors.place, game.indoors.room if game.indoors.place == "house" else "", game.mini.which]
+	var now := "%s %s %s %d" % [game.mode, game.indoors.place, game.indoors.room if game.indoors.place == "house" else "", game.mini.which * 10 + game.mini.story]
 	if now != where:
 		where = now
 		age = 0.0

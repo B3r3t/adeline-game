@@ -375,6 +375,7 @@ MUSIC = {
     # Christmas (December 1 to January 1): the game asks for "x_" + the usual name.
     "x_home": ("x_home.mp3", 0.0, 0.0, 3.0, -20), "x_cozy": ("x_cozy.mp3", 0.0, 0.0, 3.0, -20),
     "x_play": ("x_play.mp3", 0.0, 0.0, 3.0, -20), "x_ride": ("x_ride.mp3", 0.0, 0.0, 3.0, -20),
+    "sneak": ("sneak.mp3", 0.0, 0.0, 3.0, -20),
 }
 AMBIENCE = {"birds": ("birds.mp3", 0.3, 12.5, 2.0, -30), "wind": ("wind.mp3", 0.3, 0.0, 2.5, -30)}
 
@@ -439,6 +440,11 @@ MERLIN = [
     "Take your little sister. Only the very young can see a unicorn's hoofprints.",
     "Her hoofprints lead east, past the signpost. Keep your sister close and she will spot them.",
     "A unicorn in our own stable! The sky belongs to the two of you now.",
+    'The goblins have dug a burrow under the hill, and they have carried off my spell book.',
+    'It is a small, dark place, Adeline. Do be careful.',
+    'Little one! A net has fallen on your sister and on Spirit. The tunnel is too small for me.',
+    'But it is not too small for you.',
+    'The smallest of us, and the bravest. Six stars for the littlest hero!',
 ]
 
 # Things the little sister says in conversation, word for word as the game shows them.
@@ -449,9 +455,20 @@ SISTER_LINES = [
     "She doesn't want to say goodbye. She wants to come and live with us!",
     "Mom and Dad? Then I'm coming too!",
     "My pony is small but she is ever so fast. To the boat!",
+    "I'm not scared. Well, maybe a little. I'm coming, Adeline!",
+    'The pony wants to go home now.',
+    'And Spirit! I saved Spirit too!',
 ]
 
 # name in the game -> the recordings (file stems) that can play for it
+# Lines Adeline speaks in conversation, word for word: al_0.mp3, al_1.mp3 and so on.
+ADELINE_LINES = [
+    "Small and dark? Spirit and I are not afraid.",
+    "Little sister! Shh. The key is on his belt.",
+    "You did it! You were so brave.",
+    "My little sister saved me.",
+]
+
 ADELINE = {
     "strike": ["a_hah", "a_hyah", "a_yah"],
     "hurt": ["a_ow", "a_oof"],
@@ -518,6 +535,8 @@ SISTER = {
     "sister_found": ["s_found"],
     "sister_giggle": ["s_giggle"],
     "sister_merry": ["s_merry", "s_snowing"],
+    "sister_shh": ["s_shh"],
+    "sister_made_it": ["s_made_it"],
     "sister_splash": ["s_splash"],
     "sister_sparkly": ["s_sparkly"],
     "sister_muddy": ["s_muddy"],
@@ -537,6 +556,9 @@ MERLIN_CALLS = {
 ANIMALS = {
     "bleat": ["fx_bleat", "fx_bleat2"],
     "foal": ["fx_foal"],
+    "snore": ["fx_snore"],
+    "jingle": ["fx_jingle"],
+    "creak": ["fx_creak"],
     "suckle": ["fx_suckle"],
     "cluck": ["fx_cluck"],
     "meow": ["fx_meow"],
@@ -576,6 +598,10 @@ def main():
             lines[text] = file
     for i, text in enumerate(SISTER_LINES):
         file = recorded("sl_%d" % i, pitch=1.1, speed=1.0, level=-16.0)
+        if file:
+            lines[text] = file
+    for i, text in enumerate(ADELINE_LINES):
+        file = recorded("al_%d" % i, level=-16.0)
         if file:
             lines[text] = file
     for name, stems in ADELINE.items():

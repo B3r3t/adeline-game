@@ -30,6 +30,13 @@ const LIST := [
 	{ "id": "wash", "name": "Pony wash", "who": "With her sister", "line": "Scrub off the mud, then rinse off the soap.", "scene": "wash", "view": [0.36, 0.5, 0.8], "color": Color(0.2, 0.6, 0.82), "script": preload("res://scripts/mini_wash.gd") },
 ]
 
+# The two parts of Mission 4, played in the same frame as the farm games. They are not on
+# the list and win no stars: when one is played through, the mission is told (mission4.gd).
+const STORY := [
+	{ "id": "burrow", "name": "The goblin burrow", "scene": "burrow", "script": preload("res://scripts/mini_sneak.gd") },
+	{ "id": "den", "name": "The chief's den", "scene": "den", "script": preload("res://scripts/mini_key.gd") },
+]
+
 var game = null
 var font: Font
 var stage: Node2D = null
@@ -37,6 +44,8 @@ var fx: Node2D = null
 var overlay: Control = null
 var play = null  # the game being played
 var which := -1  # its place in LIST
+var info := {}  # what is known about it: its entry in LIST, or in STORY
+var story := -1  # which part of the mission it is, when it is one
 var state := ""  # "intro" (the card saying what to do), "play" or "done"
 var state_time := 0.0
 var clock := 0.0
@@ -97,7 +106,24 @@ func total_stars() -> int:
 func start(i: int) -> void:
 	close()
 	which = i
-	var info: Dictionary = LIST[i]
+	info = LIST[i]
+	_open()
+
+
+## Starts a part of Mission 4.
+func start_story(part: int) -> void:
+	close()
+	story = part
+	info = STORY[part]
+	_open()
+
+
+## The painted scene the game in hand is played on, or "" when none is.
+func scene() -> String:
+	return str(info.get("scene", ""))
+
+
+func _open() -> void:
 	game.mode = "mini"
 	stage = Node2D.new()
 	add_child(stage)
@@ -139,15 +165,26 @@ func close() -> void:
 	fx = null
 	play = null
 	which = -1
+	story = -1
+	info = {}
 	state = ""
 	finger = -1
 	sparks.clear()
 	words.clear()
 
 
+func _told(part: int) -> void:
+	game.mission4.part_done(part)
+
+
 ## Called by a game when it is over.
 func finish(won: int, line: String) -> void:
 	if state != "play":
+		return
+	if story >= 0:
+		# A part of the mission: no stars, the story goes on.
+		state = "told"
+		_told.call_deferred(story)  # once this frame is over: the scene is about to be taken down
 		return
 	state = "done"
 	state_time = 0.0
@@ -512,7 +549,6 @@ func _draw_ui() -> void:
 		play.draw_ui(overlay, s)
 	elif state == "intro":
 		overlay.draw_rect(Rect2(Vector2.ZERO, s), Color(0.04, 0.05, 0.14, 0.45))
-		var info: Dictionary = LIST[which]
 		var panel := Rect2(s.x / 2.0 - 380.0, s.y / 2.0 - 160.0, 760.0, 320.0)
 		var grown := maxf(Ui.pop(state_time / 0.3), 0.001)
 		overlay.draw_set_transform(panel.get_center() * (1.0 - grown), 0.0, Vector2(grown, grown))

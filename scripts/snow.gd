@@ -32,8 +32,8 @@ func _ready() -> void:
 func outdoors() -> bool:
 	if game.mode == "house" or game.mode == "stable" or game.mode == "shop":
 		return false
-	if game.mode == "mini" and game.mini.which >= 0:
-		return str(game.mini.LIST[game.mini.which]["scene"]) != "hut"
+	if game.mode == "mini":
+		return not (game.mini.scene() in ["hut", "burrow", "den"])
 	return true
 
 

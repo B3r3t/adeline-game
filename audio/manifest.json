@@ -197,6 +197,12 @@
    "s_merry.ogg",
    "s_snowing.ogg"
   ],
+  "sister_shh": [
+   "s_shh.ogg"
+  ],
+  "sister_made_it": [
+   "s_made_it.ogg"
+  ],
   "sister_splash": [
    "s_splash.ogg"
   ],
@@ -345,6 +351,15 @@
   "foal": [
    "fx_foal.ogg"
   ],
+  "snore": [
+   "fx_snore.ogg"
+  ],
+  "jingle": [
+   "fx_jingle.ogg"
+  ],
+  "creak": [
+   "fx_creak.ogg"
+  ],
   "suckle": [
    "fx_suckle.ogg"
   ],
@@ -400,12 +415,24 @@
   "Take your little sister. Only the very young can see a unicorn's hoofprints.": "merlin_16.ogg",
   "Her hoofprints lead east, past the signpost. Keep your sister close and she will spot them.": "merlin_17.ogg",
   "A unicorn in our own stable! The sky belongs to the two of you now.": "merlin_18.ogg",
+  "The goblins have dug a burrow under the hill, and they have carried off my spell book.": "merlin_19.ogg",
+  "It is a small, dark place, Adeline. Do be careful.": "merlin_20.ogg",
+  "Little one! A net has fallen on your sister and on Spirit. The tunnel is too small for me.": "merlin_21.ogg",
+  "But it is not too small for you.": "merlin_22.ogg",
+  "The smallest of us, and the bravest. Six stars for the littlest hero!": "merlin_23.ogg",
   "A unicorn? A real one? I'm coming!": "sl_0.ogg",
   "She says thank you! The goblins scared her and now she can't find her way home.": "sl_1.ogg",
   "Her home is up in the clouds. Can we take her? Please, please, please?": "sl_2.ogg",
   "She doesn't want to say goodbye. She wants to come and live with us!": "sl_3.ogg",
   "Mom and Dad? Then I'm coming too!": "sl_4.ogg",
-  "My pony is small but she is ever so fast. To the boat!": "sl_5.ogg"
+  "My pony is small but she is ever so fast. To the boat!": "sl_5.ogg",
+  "I'm not scared. Well, maybe a little. I'm coming, Adeline!": "sl_6.ogg",
+  "The pony wants to go home now.": "sl_7.ogg",
+  "And Spirit! I saved Spirit too!": "sl_8.ogg",
+  "Small and dark? Spirit and I are not afraid.": "al_0.ogg",
+  "Little sister! Shh. The key is on his belt.": "al_1.ogg",
+  "You did it! You were so brave.": "al_2.ogg",
+  "My little sister saved me.": "al_3.ogg"
  },
  "music": {
   "home": "music_home.ogg",
@@ -417,7 +444,8 @@
   "x_home": "music_x_home.ogg",
   "x_cozy": "music_x_cozy.ogg",
   "x_play": "music_x_play.ogg",
-  "x_ride": "music_x_ride.ogg"
+  "x_ride": "music_x_ride.ogg",
+  "sneak": "music_sneak.ogg"
  },
  "ambience": {
   "birds": "amb_birds.ogg",
