@@ -30,7 +30,7 @@ func _ready() -> void:
 
 ## Whether the game is somewhere the snow can fall.
 func outdoors() -> bool:
-	if game.mode == "house" or game.mode == "stable":
+	if game.mode == "house" or game.mode == "stable" or game.mode == "shop":
 		return false
 	if game.mode == "mini" and game.mini.which >= 0:
 		return str(game.mini.LIST[game.mini.which]["scene"]) != "hut"

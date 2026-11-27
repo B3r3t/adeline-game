@@ -148,7 +148,7 @@ func _draw_screen(s: Vector2) -> void:
 	if game.mode == "title":
 		_draw_title(s)
 		return
-	if game.mode == "games":
+	if game.mode == "games" or game.mode == "shop":
 		return
 	if not game.dialog.active:
 		# The menu button: two bars, as on a music player.
@@ -279,6 +279,7 @@ func _draw_ride(s: Vector2) -> void:
 		_pop(panel.get_center(), age)
 		var line := "Rings %d of %d     Clean jumps %d     Bumps %d" % [r.rings_got, r.rings_total, r.jumps_clean, r.stumbles]
 		_text(Vector2(panel.position.x, panel.position.y + 226.0), line, 24, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, panel.size.x)
+		_text(Vector2(panel.position.x, panel.position.y + 262.0), "+%d to spend at Merlin's shop" % game.earned, 20, Color(1.0, 0.9, 0.5), HORIZONTAL_ALIGNMENT_CENTER, panel.size.x)
 		_button(game.again_rect(), "Race again" if r.racing else "Ride again", 28, Color(0.25, 0.4, 0.75, 0.95))
 		_button(game.next_rect(), "Next race" if r.racing else "Next course", 28, Color(0.3, 0.6, 0.35, 0.95))
 
@@ -360,6 +361,7 @@ func _draw_sky(s: Vector2) -> void:
 		if k.story:
 			_text(Vector2(panel.position.x, panel.position.y + 310.0), "Tap to go on", 30, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, panel.size.x)
 		else:
+			_text(Vector2(panel.position.x, panel.position.y + 262.0), "+%d to spend at Merlin's shop" % game.earned, 20, Color(1.0, 0.9, 0.5), HORIZONTAL_ALIGNMENT_CENTER, panel.size.x)
 			_button(game.sky_again_rect(), "Fly again", 28, Color(0.25, 0.4, 0.75, 0.95))
 			_button(game.sky_next_rect(), "Next sky", 28, Color(0.3, 0.6, 0.35, 0.95))
 
@@ -432,6 +434,12 @@ func _draw_title(s: Vector2) -> void:
 			draw_colored_polygon(PackedVector2Array([c + Vector2(side * 11.0, 0.0), c + Vector2(-side * 8.0, -15.0), c + Vector2(-side * 8.0, 15.0)]), Color(1.0, 1.0, 1.0, 0.95 if can else 0.22))
 
 	_button(game.settings_rect(), "Settings", 22, Color(0.09, 0.11, 0.24, 0.6))
+	# Merlin's shop, and the stars there are to spend in it.
+	var shop_r: Rect2 = game.shop_rect()
+	_button(shop_r, "", 22, Color(0.5, 0.3, 0.72, 0.85))
+	_text(Vector2(shop_r.position.x + 22.0, shop_r.get_center().y + 8.0), "Shop", 22, Color.WHITE)
+	Ui.star(self, Vector2(shop_r.end.x - 74.0, shop_r.get_center().y - 1.0), 13.0, true)
+	_text(Vector2(shop_r.end.x - 56.0, shop_r.get_center().y + 8.0), str(int(game.data["purse"])), 22, Color(1.0, 0.92, 0.5))
 	_text(Vector2(0.0, 30.0), "build %d" % game.build_number(), 15, Color(1.0, 1.0, 1.0, 0.75), HORIZONTAL_ALIGNMENT_RIGHT, s.x - 24.0)
 	if game.update_note != "":
 		var wide_note := font.get_string_size(game.update_note, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 20).x + 44.0

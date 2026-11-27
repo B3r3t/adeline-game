@@ -156,7 +156,7 @@ func finish(won: int, line: String) -> void:
 	var id := str(LIST[which]["id"])
 	if stars > best(id):
 		game.data["mini_stars"][id] = stars
-		game._save()
+	game.earn(stars)
 	game.sound.play("fanfare", -5.0)
 	for i in 40:
 		spark(Vector2(randf_range(SAFE.position.x, SAFE.end.x), SAFE.position.y - randf() * 120.0), "confetti")
@@ -531,6 +531,7 @@ func _draw_ui() -> void:
 		Ui.panel(overlay, panel)
 		_text(overlay, Vector2(panel.position.x, panel.position.y + 70.0), "Well done!", 46, Color(1.0, 0.92, 0.5), HORIZONTAL_ALIGNMENT_CENTER, panel.size.x)
 		_text(overlay, Vector2(panel.position.x + 20.0, panel.position.y + 236.0), said, 24, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER, panel.size.x - 40.0)
+		_text(overlay, Vector2(panel.position.x, panel.position.y + 272.0), "+%d to spend at Merlin's shop" % game.earned, 20, Color(1.0, 0.9, 0.5), HORIZONTAL_ALIGNMENT_CENTER, panel.size.x)
 		Ui.button(overlay, font, again_rect(), "Play again", 26, Color(0.26, 0.6, 0.36, 0.95))
 		Ui.button(overlay, font, more_rect(), "More games", 26, Color(0.25, 0.42, 0.8, 0.95))
 		overlay.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

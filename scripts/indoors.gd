@@ -18,6 +18,7 @@ const RigScript := preload("res://scripts/rig.gd")
 const PlaymateScript := preload("res://scripts/playmate.gd")
 const KitchenScript := preload("res://scripts/kitchen.gd")
 const AdventScript := preload("res://scripts/advent.gd")
+const FoalScript := preload("res://scripts/foal.gd")
 const Moves := preload("res://scripts/moves.gd")
 const HorseScript := preload("res://scripts/horse.gd")
 const Ui := preload("res://scripts/ui.gd")
@@ -51,8 +52,14 @@ const BEDROOM := [
 	["heart_rug", 1.1, "rug", 0.0, false], ["bedside_lamp", 0.4, "floor", 0.0, true], ["teddy", 0.4, "floor", 0.0, true],
 	["toy_horse", 0.45, "floor", 0.0, true], ["poster", 0.6, "wall", 0.0, false], ["bunting", 1.0, "wall", 0.0, false],
 ]
+# Furniture from Merlin's shop. It joins the tray of its room once it has been bought.
+const BOUGHT := [
+	["globe", 0.68, "floor", 0.0, false], ["aquarium", 0.8, "floor", 0.0, false], ["piano", 0.8, "floor", 0.0, false],
+	["fireplace", 0.9, "floor", 0.0, false], ["star_lights", 0.9, "wall", 0.0, false], ["telescope", 0.75, "floor", 0.0, false],
+	["plush_unicorn", 0.55, "floor", 0.0, true], ["dollhouse", 0.75, "floor", 0.0, false],
+]
 # name and what it is for
-const CARE := [["apple", "food"], ["carrot", "food"], ["hay", "food"], ["oats", "food"], ["brush", "brush"], ["heart", "pet"]]
+const CARE := [["apple", "food"], ["carrot", "food"], ["hay", "food"], ["oats", "food"], ["brush", "brush"], ["heart", "pet"], ["bottle", "milk"]]
 
 const SPIRIT_AT := Vector2(720.0, 632.0)
 const SPIRIT_SIZE := 2.3
@@ -93,6 +100,7 @@ var adeline = null
 var playmate = null  # her little sister, when she is in the house
 var kitchen = null  # the family at their cooking and their dinner
 var advent = null  # the Christmas tree and its presents
+var foal = null  # Spirit's foal, in the stable
 var at := Vector2.ZERO  # where her feet are
 var goal := Vector2.ZERO
 var facing := 1
@@ -161,6 +169,11 @@ func _ready() -> void:
 	advent.inn = self
 	advent.game = game
 	add_child(advent)
+	foal = Node.new()
+	foal.set_script(FoalScript)
+	foal.inn = self
+	foal.game = game
+	add_child(foal)
 	if FileAccess.file_exists(SAVE_PATH):
 		var saved = JSON.parse_string(FileAccess.get_file_as_string(SAVE_PATH))
 		if saved is Dictionary:
@@ -285,6 +298,7 @@ func close() -> void:
 	playmate.closed()
 	kitchen.closed()
 	advent.closed()
+	foal.closed()
 
 
 func _layout() -> void:
@@ -380,7 +394,10 @@ func _list() -> Array:
 		return []
 	if room == "kitchen":
 		return []
-	return FURNITURE if room == "living" else BEDROOM
+	var list: Array = (FURNITURE if room == "living" else BEDROOM).duplicate()
+	for name in game.shop.furniture(room):
+		list.append(_named(name))
+	return list
 
 
 ## What the strip along the bottom shows.
@@ -639,7 +656,7 @@ func _draw_bathroom(s: Vector2) -> void:
 
 ## What is known about a kind of furniture, from either room's list.
 func _named(name: String) -> Array:
-	for entry in FURNITURE + BEDROOM:
+	for entry in FURNITURE + BEDROOM + BOUGHT:
 		if entry[0] == name:
 			return entry
 	return []
@@ -920,6 +937,7 @@ func _open_stable() -> void:
 		stage.add_child(smudge)
 		dirt.append({ "node": smudge, "spot": spot, "level": 1.0 - float(care["shine"]) })
 	celebrated = _all_full()
+	foal.opened()
 
 
 func _all_full() -> bool:
@@ -986,6 +1004,11 @@ func _tool_kind() -> String:
 
 
 func _use_tool(spot: Vector2) -> void:
+	if foal.use_tool(_tool_kind(), tool, spot):
+		# It is the foal being fed, brushed or stroked, not Spirit.
+		on_her = false
+		last_touch = spot
+		return
 	# Only movement across Spirit counts, not the trip from the tray to her.
 	var touching := _touching(spot)
 	var moved := spot.distance_to(last_touch) if touching and on_her else 0.0
@@ -1158,6 +1181,8 @@ func _process(delta: float) -> void:
 		playmate.frame(delta)
 		kitchen.frame(delta)
 		advent.frame(delta)
+	else:
+		foal.frame(delta)
 	overlay.queue_redraw()
 
 
@@ -1523,5 +1548,6 @@ func _draw_stable(s: Vector2) -> void:
 		var bar := Rect2(x + 50.0, 60.0, width - 50.0, 18.0)
 		_meter(bar, float(care[names[i][1]]), Color(1.0, 0.8, 0.25))
 		_text(Vector2(x + 50.0, 104.0), str(names[i][0]), 18, Color.WHITE)
-	if clock < 10.0 and not _all_full() and sleep == 0:
+	foal.draw_ui(s)
+	if clock < 10.0 and not _all_full() and sleep == 0 and not foal.naming and note_time <= 0.0:
 		_text(Vector2(0.0, 214.0), "Hold food up to %s's mouth. Brush every dusty patch. Stroke her with the heart." % pet, 22, Color(1.0, 0.97, 0.8), HORIZONTAL_ALIGNMENT_CENTER, s.x)

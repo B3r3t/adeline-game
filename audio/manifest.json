@@ -114,6 +114,15 @@
   "merry": [
    "a_merry.ogg"
   ],
+  "see_foal": [
+   "a_foal.ogg"
+  ],
+  "grown": [
+   "a_grown.ogg"
+  ],
+  "sleep_tight": [
+   "a_sleep_tight.ogg"
+  ],
   "present": [
    "a_present.ogg"
   ],
@@ -319,9 +328,25 @@
   "merlin_merry": [
    "m_merry.ogg"
   ],
+  "merlin_shop": [
+   "m_shop.ogg"
+  ],
+  "merlin_sold": [
+   "m_sold.ogg",
+   "m_sold2.ogg"
+  ],
+  "merlin_more": [
+   "m_more.ogg"
+  ],
   "bleat": [
    "fx_bleat.ogg",
    "fx_bleat2.ogg"
+  ],
+  "foal": [
+   "fx_foal.ogg"
+  ],
+  "suckle": [
+   "fx_suckle.ogg"
   ],
   "cluck": [
    "fx_cluck.ogg"

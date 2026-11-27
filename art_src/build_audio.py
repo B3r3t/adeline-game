@@ -489,6 +489,9 @@ ADELINE = {
     "ready_or_not": ["a_ready"],
     "found_you": ["a_found"],
     "merry": ["a_merry"],
+    "see_foal": ["a_foal"],
+    "grown": ["a_grown"],
+    "sleep_tight": ["a_sleep_tight"],
     "present": ["a_present"],
     "not_here": ["a_not_here"],
     "bath_time": ["a_bath"],
@@ -526,10 +529,15 @@ MERLIN_CALLS = {
     "merlin_splendid": ["m_splendid", "m_perfect"],
     "merlin_oops": ["m_oops"],
     "merlin_merry": ["m_merry"],
+    "merlin_shop": ["m_shop"],
+    "merlin_sold": ["m_sold", "m_sold2"],
+    "merlin_more": ["m_more"],
 }
 # Animals in the farm games: name in the game -> recordings.
 ANIMALS = {
     "bleat": ["fx_bleat", "fx_bleat2"],
+    "foal": ["fx_foal"],
+    "suckle": ["fx_suckle"],
     "cluck": ["fx_cluck"],
     "meow": ["fx_meow"],
     "ribbit": ["fx_ribbit"],

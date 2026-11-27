@@ -4,6 +4,7 @@ extends Node2D
 ## and stays back from goblin fights. Built from cutout art.
 
 const RigScript := preload("res://scripts/rig.gd")
+const Look := preload("res://scripts/look.gd")
 const Moves := preload("res://scripts/moves.gd")
 const Ui := preload("res://scripts/ui.gd")
 
@@ -94,6 +95,10 @@ func _ready() -> void:
 	saddle.scale = body_sprite.scale
 	rig.add_child(saddle)
 	rig.move_child(saddle, body_sprite.get_index() + 1)
+	if rider_art != "":
+		Look.plain(rig, art)  # somebody else's horse wears nothing of Spirit's
+	elif art.ends_with("spirit"):
+		saddle.material = Look.blanket()  # the blanket's colour, from the shop
 	# Borrow Adeline's leg art for the rider's near leg.
 	rider = Node2D.new()
 	rider.set_script(RigScript)

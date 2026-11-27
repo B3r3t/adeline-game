@@ -4,6 +4,7 @@ extends Node2D
 ## Set angles in `pose` (degrees, by part name), then call apply().
 
 const Season := preload("res://scripts/season.gd")
+const Look := preload("res://scripts/look.gd")
 
 var order: Array = []  # part names, parents before children
 var info := {}  # name -> { parent, pos, sprite }
@@ -77,6 +78,7 @@ func build(dir: String) -> void:
 		add_child(node)
 		info[p["name"]]["sprite"] = node
 	Season.dress(self, dir)  # a hat, at Christmas
+	Look.dress(self, dir)  # and whatever was bought at Merlin's shop
 	snap()
 
 

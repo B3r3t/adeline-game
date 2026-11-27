@@ -317,6 +317,68 @@ as well as one that plays well:
 - In Lost lambs the result waits until every lamb that is coming home is through the
   barn door, so the count on the panel is the true one.
 
+## Merlin's shop
+
+Stars are worth something. Every game that ends in stars (the riding course, the race,
+the sky ride, the farm games) keeps the best for that game as before, and also pays the
+stars just won into a purse, so playing again always earns. The results panel says how
+many went in. An adventure from before there was a shop starts with every star it had
+already won.
+
+The shop is the purple button beside Settings on the title screen, which shows the purse,
+and it is also on Merlin's list of missions. It has three shelves:
+
+- **Adeline:** five colours of cloak and three hats (a flower crown, a cowgirl hat, a
+  tiara). Her little sister wears the same hat, so they match.
+- **Spirit:** five colours of saddle blanket, and three things for the neck (a flower
+  garland, star charms, a first-prize ribbon), which the pony and the unicorn wear too.
+- **Home:** eight pieces of furniture, four for the living room and four for the bedroom.
+  Once bought they are in that room's tray, to be placed, turned, sized and coloured like
+  the rest.
+
+Tapping a thing looks at it: Adeline or Spirit tries it on at once. Only the big button
+buys, so a stray tap never spends anything. A thing already bought is put on or taken off
+with the same button, free, as often as she likes. Everything costs 3 to 8 stars; all of
+it together is 109, which is a good many games. Purse, things bought and what is worn are
+kept with the adventure, and "Start a new adventure" clears them with the rest.
+
+How it is built: `scripts/shop.gd` is the shop, and `ITEMS` at its top is the whole stock
+(name, shelf, price); adding a thing is one more line there and a picture. `scripts/look.gd`
+is what is worn. The colours need no pictures of their own: a shader finds the purple of
+the cloak (or the blanket) and turns it round the colour wheel, and `COLOURS` says how far
+for each. Hats and neck things are pictures in `art/shop`, put on the puppets in the same
+places as the Christmas hats and collars (a bought hat is worn instead of the Christmas
+one). Every puppet is dressed as it is built, so the choice shows everywhere: on the
+island, on the rides, in the house and in the farm games. The pictures are cut from drawn
+sheets by `art_src/build_shop.py`, which also makes the cards for each colour with the same
+sum as the shader.
+
+## Spirit's foal
+
+There is a foal in the stable. The first time Adeline goes in she is asked to name her,
+from six names. Then, each day, the foal wants three things, shown on a little plate over
+her head: her milk (the bottle in the tray, held to her for a couple of seconds), a brush
+and a cuddle (the heart). They are given just as Spirit is looked after, with the same
+tray.
+
+When all three are done she is cared for that day. That is one day of growing, and a star
+for the purse. She does the growing overnight: the next day she is a little bigger, and
+Adeline sees it happen as she walks in. After two days of care she stands up, after five
+she trots about the stable and will take a carrot or an apple instead of her bottle, and
+after ten she is all grown up, which is worth five stars. She can still be looked after
+every day after that.
+
+A missed day costs nothing. She does not go hungry or get sad: she waits, and grows the
+day after she is next cared for. There is only ever one day of growing a day, so it
+cannot be hurried either. At "Bedtime for Spirit" she goes to sleep too.
+
+How it is built: `scripts/foal.gd`, a child of the indoors scene like the kitchen. What it
+keeps is `foal` in the save: her name, the days she has been cared for (`days`), the size
+Adeline has seen her at (`seen`), and today's milk, brush and cuddle. `GROWN` at the top is
+how many days it takes, and `stage_of` says what she can do at each age. She is seven
+drawn poses (`art/foal`), not a jointed puppet, and grows by being drawn bigger. The
+pictures are cut by `art_src/build_shop.py`.
+
 ## Christmas
 
 From December 1 to January 1, by the tablet's own date, the whole game dresses for
@@ -516,8 +578,11 @@ How movement stays smooth
 - `scripts/mini.gd` is the frame the five farm games run in, and the list they are chosen
   from. Each game is its own file: `mini_apples.gd`, `mini_lambs.gd`, `mini_potions.gd`,
   `mini_hide.gd`, `mini_wash.gd`.
+- `scripts/shop.gd` is Merlin's shop and `scripts/look.gd` is what Adeline and the horses
+  wear from it.
 - `scripts/season.gd` says whether it is Christmas and picks the winter pictures.
   `scripts/snow.gd` is the falling snow, and `scripts/advent.gd` the tree and its presents.
+- `scripts/foal.gd` is Spirit's foal in the stable.
 - `scripts/scenery.gd` is the sky, trees, flowers and animals. `scripts/ui.gd` is how panels
   and buttons are drawn. `scripts/sound.gd` plays every sound and the music.
 - `.github/workflows/build-apk.yml` builds the app.

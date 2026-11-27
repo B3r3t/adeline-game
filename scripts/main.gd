@@ -19,6 +19,8 @@ const Mission2Script := preload("res://scripts/mission2.gd")
 const Mission3Script := preload("res://scripts/mission3.gd")
 const SkyScript := preload("res://scripts/sky.gd")
 const MiniScript := preload("res://scripts/mini.gd")
+const ShopScript := preload("res://scripts/shop.gd")
+const Look := preload("res://scripts/look.gd")
 const SceneryScript := preload("res://scripts/scenery.gd")
 
 const GROUND_Y := 560.0
@@ -96,6 +98,7 @@ var sound = null  # voices, grunts and effects
 var sound_on := true
 var indoors = null  # the living room and the stable
 var mini = null  # the farm games
+var shop = null  # Merlin's shop
 var place_action := ""  # a building Adeline is standing at: house or stable
 var zoom := CAMERA_ZOOM
 var merlin: Sprite2D
@@ -133,6 +136,7 @@ var new_game_armed := false
 var update_note := ""  # shown on the title screen
 var guard_cleared := false
 var clock := 0.0
+var earned := 0  # the stars the last game paid into the purse, for its results panel
 var merry := 4.0  # seconds until Merlin may call his Christmas greeting again
 
 
@@ -229,6 +233,10 @@ func _ready() -> void:
 	mini.set_script(MiniScript)
 	mini.game = self
 	layer.add_child(mini)
+	shop = Control.new()
+	shop.set_script(ShopScript)
+	shop.game = self
+	layer.add_child(shop)
 	layer.move_child(mini, hud.get_index())  # under the menu button and the speech box
 	# Snow, at Christmas, over the scene but under everything that is read or pressed.
 	var snow := Control.new()
@@ -427,7 +435,7 @@ func _add_wall(rect: Rect2) -> void:
 # --- Saved progress ---------------------------------------------------------
 
 func _default_data() -> Dictionary:
-	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "hair": 0, "m2": "available", "m2_step": 0, "m2_thanked": false, "m3": "available", "m3_step": 0, "m3_clues": 0, "m3_thanked": false, "mount": "spirit", "sky_course": 1, "sky_stars": {}, "mini_stars": {}, "advent": { "year": 0, "days": [] } }
+	return { "m1": "available", "cleared": 0, "shield": false, "checkpoint_x": START_X, "practice_round": 1, "ride_course": 1, "ride_stars": {}, "race_course": 1, "race_stars": {}, "ribbon": 0, "hair": 0, "m2": "available", "m2_step": 0, "m2_thanked": false, "m3": "available", "m3_step": 0, "m3_clues": 0, "m3_thanked": false, "mount": "spirit", "sky_course": 1, "sky_stars": {}, "mini_stars": {}, "advent": { "year": 0, "days": [] }, "purse": -1, "owned": [], "foal": { "name": "", "days": 0, "seen": 0, "last": 0, "day": 0, "milk": 0.0, "brush": 0.0, "love": 0.0 }, "look": { "cloak": "purple", "blanket": "purple", "hat": "", "neck": "" } }
 
 
 func has_save() -> bool:
@@ -438,16 +446,38 @@ func _load() -> void:
 	_load_settings()
 	data = _default_data()
 	if not has_save():
+		_open_purse()
 		return
 	var file := FileAccess.open(SAVE_PATH, FileAccess.READ)
 	if file == null:
+		_open_purse()
 		return
 	var parsed = JSON.parse_string(file.get_as_text())
 	if parsed is Dictionary:
 		for key in data:
 			if parsed.has(key):
 				data[key] = parsed[key]
+	_open_purse()
 
+
+
+## Stars to spend at Merlin's shop. An adventure from before there was a shop starts with
+## every star it has already won; a new one starts with none. Then what is worn is put on.
+func _open_purse() -> void:
+	if int(data["purse"]) < 0:
+		var won := 0
+		for kind in ["ride_stars", "race_stars", "sky_stars", "mini_stars"]:
+			for key in data[kind]:
+				won += int(data[kind][key])
+		data["purse"] = won
+	Look.load_from(data["look"])
+
+
+## Pays the stars of a game just finished into the purse, and saves.
+func earn(stars: int) -> void:
+	data["purse"] = int(data["purse"]) + maxi(stars, 0)
+	earned = maxi(stars, 0)
+	_save()
 
 
 func _save() -> void:
@@ -579,6 +609,7 @@ func _on_update_pack(result: int, code: int, _headers: PackedStringArray, _body:
 func _start(new_game: bool) -> void:
 	if new_game:
 		data = _default_data()
+		_open_purse()
 	_save()
 	new_game_armed = false
 	mode = "play"
@@ -622,7 +653,7 @@ func _update_limits() -> void:
 
 
 func input_locked() -> bool:
-	return mode == "title" or mode == "games" or mode == "mini" or mode == "house" or mode == "stable" or mode == "sky" or dialog.active or defeated or (mode == "ride" and ride.finished) or (mode == "play" and (sister.busy() or mission2.fading()))
+	return mode == "title" or mode == "games" or mode == "shop" or mode == "mini" or mode == "house" or mode == "stable" or mode == "sky" or dialog.active or defeated or (mode == "ride" and ride.finished) or (mode == "play" and (sister.busy() or mission2.fading()))
 
 
 ## A little cloud of dust on the ground.
@@ -997,11 +1028,14 @@ func _show_missions() -> void:
 	if m1 == "done":
 		var n := int(data["practice_round"])
 		rows.append({ "id": "practice", "label": "Practice fight: %d goblin%s" % [n, "" if n == 1 else "s"], "status": "Ready", "enabled": true })
+	rows.append({ "id": "shop", "label": "Merlin's shop", "status": "%d stars to spend" % int(data["purse"]), "enabled": true })
 	dialog.choose("Merlin's missions", rows, _on_mission_picked)
 
 
 func _on_mission_picked(id: String) -> void:
-	if id == "m1":
+	if id == "shop":
+		shop.open()
+	elif id == "m1":
 		data["m1"] = "active"
 		_update_limits()
 		_save()
@@ -1186,6 +1220,11 @@ func race_rect() -> Rect2:
 
 func settings_rect() -> Rect2:
 	return Rect2(36.0, 30.0, 176.0, 54.0)
+
+
+## The way into Merlin's shop from the title screen, beside Settings.
+func shop_rect() -> Rect2:
+	return Rect2(224.0, 30.0, 212.0, 54.0)
 
 
 # --- Menus: settings on the title screen, and the pause menu everywhere else -------------
@@ -1420,7 +1459,7 @@ func on_sky_finished(number: int, stars: int) -> void:
 		var key := str(number)
 		if stars > int(best.get(key, 0)):
 			best[key] = stars
-		_save()
+		earn(stars)
 
 
 func on_ride_finished(number: int, stars: int) -> void:
@@ -1428,7 +1467,7 @@ func on_ride_finished(number: int, stars: int) -> void:
 	var key := str(number)
 	if stars > int(best.get(key, 0)):
 		best[key] = stars
-	_save()
+	earn(stars)
 	sound.play("fanfare", -5.0, 0.0)
 	sound.shout("adeline", "we_did_it", 1.0, true)
 
@@ -1436,6 +1475,7 @@ func on_ride_finished(number: int, stars: int) -> void:
 func go_title() -> void:
 	if not dialog.active:
 		mini.close()
+		shop.close()
 		mode = "title"
 		_place_player()
 		sound.hush()
@@ -1466,12 +1506,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			_start(not has_save())
 		elif settings_rect().has_point(pos):
 			open_menu("settings")
+		elif shop_rect().has_point(pos):
+			shop.open()
 		else:
 			for i in GAMES.size():
 				if card_rect(i).has_point(pos):
 					_tap_card(i, pos)
-	elif mode == "games":
-		pass  # the list of farm games answers its own taps
+	elif mode == "games" or mode == "shop":
+		pass  # the list of farm games, and the shop, answer their own taps
 	elif has_pos and menu_rect().has_point(pos):
 		open_menu("pause")
 	elif mode == "play" and place_action != "" and has_pos and enter_rect().has_point(pos) and not dialog.active:
@@ -1582,6 +1624,9 @@ func _set_the_mood() -> void:
 			tune = "sky" if sky.high_up() else "home"
 			air = "wind" if sky.high_up() else "birds"
 		"house", "stable":
+			tune = "cozy"
+			air = ""
+		"shop":
 			tune = "cozy"
 			air = ""
 		"games", "mini":
